@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"time"
 )
 
 // piCheckpoint 只写本地运行记录，不作为回答或已接受的对话发布。
@@ -153,7 +152,7 @@ func (s *Server) continueSessionRun(w http.ResponseWriter, r *http.Request) {
 	} else {
 		config.Models[record.Provider] = record.Checkpoint.Model
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+	ctx, cancel := context.WithCancel(context.Background())
 	ctx, finish, err := s.beginDocumentTask(ctx, document.ID)
 	if err != nil {
 		cancel()

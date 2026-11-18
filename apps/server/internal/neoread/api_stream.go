@@ -178,7 +178,7 @@ func streamCompletion(ctx context.Context, c APIConnection, req completionReques
 	}
 
 	// Respect the request-specific generation deadline (longer for batches).
-	if _, bounded := ctx.Deadline(); !bounded {
+	if _, bounded := ctx.Deadline(); !bounded && in.Chat == nil {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, 15*time.Minute)
 		defer cancel()

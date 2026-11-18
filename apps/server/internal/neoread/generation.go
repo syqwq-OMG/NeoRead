@@ -225,10 +225,7 @@ func (g *GenerationService) generate(ctx context.Context, in AIInput, interactiv
 	if timeout <= 0 {
 		timeout = 15 * time.Minute
 	}
-	if in.Chat != nil {
-		timeout = time.Hour
-	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := generationContext(ctx, in.Chat != nil, timeout)
 	defer cancel()
 	if !validAgent(g.primary) {
 		return AIResult{}, generationError(ErrorConfiguration, "请在设置中指定主 Agent 并测试")
@@ -307,4 +304,13 @@ func (g *GenerationService) ValidateInput(in AIInput, interactive bool) error {
 		return nil
 	}
 	return generationError(ErrorCapability, "当前助手尚未通过所需能力测试，请在设置中测试连接或配置备用 API")
+}
+
+// Interactive runs are stopped by the user or document lifecycle, not elapsed time.
+// A caller deadline still takes precedence; background generations remain bounded.
+func generationContext(parent context.Context, chat bool, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if chat {
+		return context.WithCancel(parent)
+	}
+	return context.WithTimeout(parent, timeout)
 }
