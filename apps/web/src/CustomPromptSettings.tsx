@@ -103,7 +103,7 @@ export function CustomPromptSettings() {
             }}
           >
             <div className="space-y-2">
-              <label htmlFor={`${id}-description`} className="text-sm">
+              <label htmlFor={`${id}-description`} className="block text-sm">
                 功能描述
               </label>
               <Input
@@ -114,7 +114,7 @@ export function CustomPromptSettings() {
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor={`${id}-prompt`} className="text-sm">
+              <label htmlFor={`${id}-prompt`} className="block text-sm">
                 具体 prompt
               </label>
               <Textarea

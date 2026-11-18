@@ -29,7 +29,7 @@ export function ChatTimeoutSettings({
           if (valid) void onSave(minutes);
         }}
       >
-        <label htmlFor={id} className="text-sm font-medium">
+        <label htmlFor={id} className="block text-sm font-medium">
           聊天等待时间上限（分钟）
         </label>
         <div className="flex items-center gap-2">

@@ -1687,6 +1687,10 @@ export function Workspace({
                         解释核心概念
                         <ArrowLeft className="ml-auto rotate-180" />
                       </Button>
+                      <CustomPrompts
+                        disabled={!adapter || sending || aiModelSaving}
+                        onSend={(prompt) => void send(prompt, [], true)}
+                      />
                     </div>
                   }
                   extras={(message) => (
@@ -1714,10 +1718,6 @@ export function Workspace({
                       />
                     </>
                   )}
-                />
-                <CustomPrompts
-                  disabled={!adapter || sending || aiModelSaving}
-                  onSend={(prompt) => void send(prompt, [], true)}
                 />
                 <div className="chat-compose" data-tour="compose">
                   {quotes.length > 0 && (
