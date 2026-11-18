@@ -11,11 +11,13 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 let host: HTMLDivElement, root: Root;
 const send = vi.fn();
 const button = (label: string) =>
-  [...host.querySelectorAll("button")].find((b) => b.textContent === label)!;
+  [...document.querySelectorAll("button")].find(
+    (b) => b.textContent === label,
+  )!;
 const click = async (label: string) => act(async () => button(label).click());
 async function type(tag: "input" | "textarea", value: string) {
   await act(async () => {
-    const element = host.querySelector(tag)!;
+    const element = document.querySelector(tag)!;
     const prototype =
       tag === "input"
         ? HTMLInputElement.prototype
@@ -54,9 +56,11 @@ afterEach(() => {
 
 it("saves description and prompt separately, updates badges, restores and deletes", async () => {
   await render();
+  expect(document.querySelector("input")).toBeNull();
+  await click("添加");
   await type("input", "解释术语");
   await type("textarea", "请解释当前阅读内容中的专业术语。");
-  await click("添加");
+  await click("保存");
   expect(readPrompts()[0]).toMatchObject({
     description: "解释术语",
     prompt: "请解释当前阅读内容中的专业术语。",
@@ -66,7 +70,7 @@ it("saves description and prompt separately, updates badges, restores and delete
   await click("编辑");
   await type("input", "举例说明");
   await type("textarea", "请举一个具体例子。");
-  await click("保存修改");
+  await click("保存");
   expect(button("解释术语")).toBeUndefined();
   await click("举例说明");
   expect(send).toHaveBeenLastCalledWith("请举一个具体例子。");
@@ -82,18 +86,20 @@ it("saves description and prompt separately, updates badges, restores and delete
 
 it("retains the saved item and edit draft when persistence fails", async () => {
   await render();
+  expect(document.querySelector("input")).toBeNull();
+  await click("添加");
   await type("input", "原描述");
   await type("textarea", "原 prompt");
-  await click("添加");
+  await click("保存");
   await click("编辑");
   await type("input", "新描述");
   vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
     throw new Error("quota");
   });
-  await click("保存修改");
+  await click("保存");
   expect(button("原描述")).toBeDefined();
   expect(button("新描述")).toBeUndefined();
-  expect(host.querySelector("input")?.value).toBe("新描述");
+  expect(document.querySelector("input")?.value).toBe("新描述");
   expect(readPrompts()[0].description).toBe("原描述");
 });
 
