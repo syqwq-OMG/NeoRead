@@ -74,7 +74,7 @@ export function CustomPromptSettings() {
         ))}
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editing ? "编辑常用 prompt" : "添加常用 prompt"}
@@ -119,6 +119,7 @@ export function CustomPromptSettings() {
               </label>
               <Textarea
                 id={`${id}-prompt`}
+                className="max-h-[min(20rem,40dvh)] overflow-y-auto"
                 rows={6}
                 maxLength={20000}
                 value={prompt}
