@@ -27,6 +27,7 @@ import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messag
 import { Type } from "typebox";
 
 export interface AgentRequest {
+  timeoutMs?: number;
   version: 1;
   runId: string;
   prompt: string;
@@ -178,6 +179,9 @@ export async function runAgent(
   // SDK 在自己的重试/压缩循环中发起下一次请求；只在请求边界等待宿主持久化。
   const withCheckpoint = <T extends StreamOptions>(options?: T) => ({
     ...options,
+    // Go owns the run deadline and aborts the worker on stop. Avoid the SDK's
+    // implicit ten-minute HTTP deadline for long reasoning/model requests.
+    timeoutMs: input.timeoutMs ?? 2_147_483_647,
     onPayload: async (payload: unknown, currentModel: Model<Api>) => {
       await checkpointBarrier;
       signal.throwIfAborted();

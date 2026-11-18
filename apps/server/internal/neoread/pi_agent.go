@@ -19,6 +19,7 @@ import (
 // Each run has an isolated worker. Only a successful, settled result is returned
 // for the caller's message + continuation transaction.
 type piRequest struct {
+	TimeoutMs          int64               `json:"timeoutMs"`
 	DisableRetry       bool                `json:"disableRetry,omitempty"`
 	Connection         *piConnection       `json:"connection,omitempty"`
 	Mode               string              `json:"mode,omitempty"`
@@ -70,6 +71,12 @@ func piImage(data []byte) map[string]string {
 }
 
 func runPiWorker(ctx context.Context, root string, request piRequest, event func(piEvent) error, tool func(string, json.RawMessage) ([]any, error)) (piEvent, error) {
+	// SDK clients otherwise impose their own ten-minute HTTP timeout. The host
+	// owns cancellation; use its remaining deadline or the largest Node timer.
+	request.TimeoutMs = 2147483647
+	if deadline, ok := ctx.Deadline(); ok {
+		request.TimeoutMs = max(1, min(request.TimeoutMs, time.Until(deadline).Milliseconds()+1000))
+	}
 	return runPiOperation(ctx, root, "start", request.RunID, request, request.DurableCheckpoints, event, tool)
 }
 
