@@ -1,3 +1,4 @@
+import { CustomPrompts } from "./chat/CustomPrompts";
 import { useAnnotationUpdates } from "./useAnnotationUpdates";
 import { webSearchEnabled } from "./chat/web-search";
 import { NavigationTree } from "./NavigationTree";
@@ -1713,6 +1714,10 @@ export function Workspace({
                       />
                     </>
                   )}
+                />
+                <CustomPrompts
+                  disabled={!adapter || sending || aiModelSaving}
+                  onSend={(prompt) => void send(prompt, [], true)}
                 />
                 <div className="chat-compose" data-tour="compose">
                   {quotes.length > 0 && (
