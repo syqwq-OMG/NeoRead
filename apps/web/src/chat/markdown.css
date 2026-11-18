@@ -51,6 +51,9 @@
   font-size: 0.95em;
   font-family: ui-monospace, monospace;
 }
+.message-markdown pre code {
+  font-family: var(--assistant-code-font-family, ui-monospace, monospace);
+}
 .markdown-code {
   min-width: 0;
   max-width: 100%;

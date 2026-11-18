@@ -98,6 +98,14 @@ export const stepTranslationSize = stepReadingTextSize;
 const serifStack =
   '"Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", ui-serif, serif';
 
+const codeFontStack =
+  "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+export function chatCodeFont(family = "monospace") {
+  if (family === "monospace") return codeFontStack;
+  if (family === "sans-serif" || family === "serif") return family;
+  return `"${family.replace(/["\\]/g, "")}", ${codeFontStack}`;
+}
+
 /** CSS font-family for translated text; installed fonts fall back to sans. */
 export function translationFont(
   family = defaultTheme.translationFontFamily ?? "serif",

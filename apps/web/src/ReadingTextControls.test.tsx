@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { defaultTheme, type ReaderTheme } from "@neoread/core";
@@ -19,6 +19,7 @@ const render = (
   theme: Partial<ReaderTheme>,
   readingMode: ReadingMode = "parallel",
   docType: "pdf" | "epub" = "pdf",
+  setTheme: (patch: Partial<ReaderTheme>) => void = () => {},
 ) => {
   host = document.createElement("div");
   document.body.append(host);
@@ -27,7 +28,7 @@ const render = (
     root!.render(
       <ReadingTextControls
         theme={{ ...defaultTheme, ...theme }}
-        setTheme={() => {}}
+        setTheme={setTheme}
         docType={docType}
         readingMode={readingMode}
       />,
@@ -39,6 +40,32 @@ const labels = (node: HTMLElement) =>
   [...node.querySelectorAll("[aria-label], [data-slot=slider] *")].map((e) =>
     e.getAttribute("aria-label"),
   );
+
+it("changes the code font independently in the reading appearance panel", async () => {
+  const setTheme = vi.fn();
+  const node = render(
+    { assistantFontFamily: "serif", assistantCodeFontFamily: "Consolas" },
+    "parallel",
+    "pdf",
+    setTheme,
+  );
+  const trigger = node.querySelector<HTMLButtonElement>(
+    '[aria-label="代码块字体"]',
+  )!;
+  expect(trigger.textContent).toContain("Consolas");
+  await act(async () => trigger.click());
+  const option = [
+    ...document.querySelectorAll<HTMLElement>('[role="option"]'),
+  ].find((item) => item.textContent === "默认等宽字体")!;
+  expect(option).toBeTruthy();
+  await act(async () => {
+    option.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    option.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+  });
+  expect(setTheme).toHaveBeenCalledWith({
+    assistantCodeFontFamily: "monospace",
+  });
+});
 
 it("gives reflowed PDF source the font, weight and size controls", () => {
   const node = render({ textReflow: true });

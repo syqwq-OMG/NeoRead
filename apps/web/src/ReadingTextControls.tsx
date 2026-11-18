@@ -21,6 +21,7 @@ import {
   epubSizePercent,
   READING_MARGIN,
   sourceFont,
+  chatCodeFont,
   translationFont,
   translationFontLabel,
 } from "./appearance";
@@ -217,6 +218,19 @@ export function ReadingTextControls({
           }
         />
       </Section>
+      <Separator />
+      <Section title="代码块">
+        <FontRow
+          label="代码块"
+          family={theme.assistantCodeFontFamily ?? "monospace"}
+          preview={chatCodeFont}
+          onFamily={(assistantCodeFontFamily) =>
+            setTheme({ assistantCodeFontFamily })
+          }
+          monospace
+          fonts={fonts}
+        />
+      </Section>
       {showLayout && (
         <>
           <Separator />
@@ -344,14 +358,16 @@ function FontRow({
   onFamily,
   bold,
   onBold,
+  monospace = false,
   fonts: { installed, loading, loadFonts },
 }: {
   label: string;
   family: string;
   preview: (family: string) => string;
   onFamily: (family: string) => void;
-  bold: boolean;
-  onBold: (bold: boolean) => void;
+  bold?: boolean;
+  onBold?: (bold: boolean) => void;
+  monospace?: boolean;
   fonts: {
     installed: string[];
     loading: boolean;
@@ -361,7 +377,10 @@ function FontRow({
   const [open, setOpen] = useState(false);
   // A saved font stays selectable before the installed list is read.
   const list =
-    family === "serif" || family === "sans-serif" || installed.includes(family)
+    family === "serif" ||
+    family === "sans-serif" ||
+    (monospace && family === "monospace") ||
+    installed.includes(family)
       ? installed
       : [family, ...installed];
   const canLoad = canQueryLocalFonts();
@@ -390,11 +409,21 @@ function FontRow({
                 className="truncate"
                 style={{ fontFamily: preview(family) }}
               >
-                {translationFontLabel(family)}
+                {monospace && family === "monospace"
+                  ? "默认等宽字体"
+                  : translationFontLabel(family)}
               </span>
             </SelectValue>
           </SelectTrigger>
           <SelectContent className="max-h-72">
+            {monospace && (
+              <SelectItem
+                value="monospace"
+                style={{ fontFamily: chatCodeFont() }}
+              >
+                默认等宽字体
+              </SelectItem>
+            )}
             <SelectItem
               value="sans-serif"
               style={{ fontFamily: preview("sans-serif") }}
@@ -435,16 +464,18 @@ function FontRow({
             )}
           </SelectContent>
         </Select>
-        <Toggle
-          size="sm"
-          variant="outline"
-          className="shrink-0"
-          aria-label={`${label}加粗`}
-          pressed={bold}
-          onPressedChange={onBold}
-        >
-          <Bold />
-        </Toggle>
+        {onBold && (
+          <Toggle
+            size="sm"
+            variant="outline"
+            className="shrink-0"
+            aria-label={`${label}加粗`}
+            pressed={bold}
+            onPressedChange={onBold}
+          >
+            <Bold />
+          </Toggle>
+        )}
       </div>
     </Row>
   );

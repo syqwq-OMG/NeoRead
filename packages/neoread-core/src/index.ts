@@ -440,6 +440,8 @@ export interface ReaderTheme {
   assistantFontScale?: number;
   /** AI conversation font: "sans-serif" keeps the interface font. */
   assistantFontFamily?: string;
+  /** Chat code block font; unset uses the system monospace stack. */
+  assistantCodeFontFamily?: string;
   assistantFontWeight?: "normal" | "bold";
   /** "sans-serif", "serif" or an installed font family name. */
   translationFontFamily?: string;

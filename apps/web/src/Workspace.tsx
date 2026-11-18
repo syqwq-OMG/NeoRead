@@ -134,7 +134,7 @@ import { useReaderStore } from "./store";
 import { scheduleProgress, flushProgress } from "./progress";
 import { pdfModeLocation, savePDFProgress } from "./pdf-progress";
 import { ReadingTextControls } from "./ReadingTextControls";
-import { translationFont } from "./appearance";
+import { chatCodeFont, translationFont } from "./appearance";
 import { AppearancePicker } from "./AppearancePicker";
 import { SearchInput } from "./SearchInput";
 function IconButton({
@@ -1250,7 +1250,7 @@ export function Workspace({
             >
               <Type />
             </PopoverTrigger>
-            <PopoverContent className="w-80">
+            <PopoverContent className="max-h-[min(80dvh,var(--available-height))] w-80 overflow-y-auto">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-medium">阅读外观</h3>
                 <div ref={setSourceAutoCenterToolbar} />
@@ -1596,6 +1596,9 @@ export function Workspace({
                 style={
                   {
                     "--assistant-font-scale": assistantSize,
+                    "--assistant-code-font-family": chatCodeFont(
+                      theme.assistantCodeFontFamily,
+                    ),
                     // Unset variables leave the interface font and weight.
                     ...(assistantFamily !== "sans-serif" && {
                       "--assistant-font-family":
