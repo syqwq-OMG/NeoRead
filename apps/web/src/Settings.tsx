@@ -6,6 +6,7 @@ import { PaperServiceSettings } from "./papers/PaperServiceSettings";
 import { AutoTranslationSettings } from "./papers/AutoTranslationSettings";
 import { TranslationPromptSettings } from "./TranslationPromptSettings";
 import { CustomPromptSettings } from "./CustomPromptSettings";
+import { ChatTimeoutSettings } from "./ChatTimeoutSettings";
 import { WebSearchSettings } from "./WebSearchSettings";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -1190,6 +1191,18 @@ export function Settings({
             )}
           </TabsContent>
           <TabsContent value="agent" className="settings-panel" keepMounted>
+            {config && (
+              <ChatTimeoutSettings
+                value={config.chatTimeoutMinutes ?? 0}
+                disabled={saving || aiModelSaving}
+                onSave={(chatTimeoutMinutes) =>
+                  saveConfig(
+                    (latest) => ({ ...latest, chatTimeoutMinutes }),
+                    false,
+                  )
+                }
+              />
+            )}
             <section
               data-tour="agent-section"
               data-deck-open={deckOpen}

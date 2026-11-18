@@ -2,7 +2,6 @@ package neoread
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -251,7 +250,7 @@ func (s *Server) chatDocument(w http.ResponseWriter, r *http.Request, document D
 		return
 	}
 	defer s.aiMu.Unlock()
-	ctx, cancel := context.WithTimeout(r.Context(), time.Hour)
+	ctx, cancel := chatRunContext(r.Context(), config)
 	defer cancel()
 	ctx, finish, taskErr := s.beginDocumentTask(ctx, documentID)
 	if taskErr != nil {

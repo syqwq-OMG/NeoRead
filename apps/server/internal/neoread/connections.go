@@ -47,11 +47,12 @@ type Capability struct {
 	Fingerprint         string `json:"-"`
 }
 type AIConfig struct {
-	piConnections map[string]APIConnection
-	WebSearch     *WebSearchConfig             `json:"webSearch,omitempty"`
-	Primary       string                       `json:"primary"`
-	Models        map[string]string            `json:"models"`
-	Efforts       map[string]map[string]string `json:"efforts,omitempty"`
+	ChatTimeoutMinutes *int `json:"chatTimeoutMinutes,omitempty"`
+	piConnections      map[string]APIConnection
+	WebSearch          *WebSearchConfig             `json:"webSearch,omitempty"`
+	Primary            string                       `json:"primary"`
+	Models             map[string]string            `json:"models"`
+	Efforts            map[string]map[string]string `json:"efforts,omitempty"`
 	// Translation choices are independent of chat. An empty model means
 	// NeoRead picks the fast tier from the live catalog.
 	TranslationModels  map[string]string            `json:"translationModels,omitempty"`
@@ -323,6 +324,10 @@ func (s *Server) putAIConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := body.AIConfig
+	if c.ChatTimeoutMinutes != nil && (*c.ChatTimeoutMinutes < 0 || *c.ChatTimeoutMinutes > 1440) {
+		fail(w, 400, "聊天等待上限必须为 0 到 1440 分钟，0 表示不限时")
+		return
+	}
 	if body.WebSearch != nil {
 		c.WebSearch = &body.WebSearch.WebSearchConfig
 	}
@@ -356,6 +361,9 @@ func (s *Server) putAIConfig(w http.ResponseWriter, r *http.Request) {
 	s.configMu.Lock()
 	defer s.configMu.Unlock()
 	old := s.readAIConfig()
+	if c.ChatTimeoutMinutes == nil {
+		c.ChatTimeoutMinutes = old.ChatTimeoutMinutes
+	}
 	c.piConnections = old.piConnections
 	if c.WebSearch == nil {
 		c.WebSearch = old.WebSearch

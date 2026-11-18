@@ -805,6 +805,8 @@ export interface WebSearchConfig {
 }
 
 export interface AIConfig {
+  /** Total chat runtime limit in minutes; zero or omitted means unlimited. */
+  chatTimeoutMinutes?: number;
   /** Persistent search permissions and a search connection independent of the model. */
   webSearch?: WebSearchConfig;
   primary: string;

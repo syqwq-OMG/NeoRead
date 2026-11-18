@@ -7221,6 +7221,13 @@
                       "maxLength": 6000,
                       "description": "Translation style and terminology preferences. Empty resets to default; omission preserves the saved value. Does not replace source-alignment or output-format rules.",
                     },
+                  "chatTimeoutMinutes":
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1440,
+                      "description": "Total chat runtime in minutes. Zero means unlimited. Omission preserves the saved preference; older installations default to unlimited. Applies to new and continued runs, not running requests.",
+                    },
                   "translationEfforts":
                     {
                       "type": "object",

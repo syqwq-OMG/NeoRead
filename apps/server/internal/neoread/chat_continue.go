@@ -152,7 +152,7 @@ func (s *Server) continueSessionRun(w http.ResponseWriter, r *http.Request) {
 	} else {
 		config.Models[record.Provider] = record.Checkpoint.Model
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := chatRunContext(context.Background(), config)
 	ctx, finish, err := s.beginDocumentTask(ctx, document.ID)
 	if err != nil {
 		cancel()

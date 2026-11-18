@@ -5692,6 +5692,8 @@ export interface components {
             };
             /** @description Translation style and terminology preferences. Empty resets to default; omission preserves the saved value. Does not replace source-alignment or output-format rules. */
             translationPrompt?: string;
+            /** @description Total chat runtime in minutes. Zero means unlimited. Omission preserves the saved preference; older installations default to unlimited. Applies to new and continued runs, not running requests. */
+            chatTimeoutMinutes?: number;
             /** @description Translation effort by provider and model ID. Defaults to medium. */
             translationEfforts?: {
                 [key: string]: {

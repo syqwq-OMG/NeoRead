@@ -109,7 +109,7 @@ func (s *Server) startSessionChat(w http.ResponseWriter, r *http.Request, docume
 		fail(w, 429, "最多同时运行 4 个会话，请等待一个会话结束")
 		return
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := chatRunContext(context.Background(), config)
 	ctx, finish, err := s.beginDocumentTask(ctx, document.ID)
 	if err != nil {
 		cancel()
@@ -341,4 +341,13 @@ func (s *Server) cancelSessionRun(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	respond(w, 200, map[string]bool{"ok": true})
+}
+
+// Freeze the configured limit when a run starts; changing preferences does not
+// cancel an in-flight request. Zero and older configurations mean unlimited.
+func chatRunContext(parent context.Context, config AIConfig) (context.Context, context.CancelFunc) {
+	if config.ChatTimeoutMinutes != nil && *config.ChatTimeoutMinutes > 0 && *config.ChatTimeoutMinutes <= 1440 {
+		return context.WithTimeout(parent, time.Duration(*config.ChatTimeoutMinutes)*time.Minute)
+	}
+	return context.WithCancel(parent)
 }
