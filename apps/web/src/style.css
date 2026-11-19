@@ -1189,7 +1189,7 @@ kbd {
   mix-blend-mode: normal;
 }
 .pdf-annotation-tools[data-dock="top"] {
-  top: 0;
+  top: 8px;
   left: 50%;
   transform: translateX(-50%);
 }
