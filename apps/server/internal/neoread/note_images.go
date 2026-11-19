@@ -96,7 +96,7 @@ func (s *Server) saveNoteImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	config, err := png.DecodeConfig(bytes.NewReader(data))
-	if err != nil || config.Width < 1 || config.Height < 1 || int64(config.Width)*int64(config.Height) > 8000000 {
+	if err != nil || config.Width < 1 || config.Height < 1 || config.Width > 8000000 || config.Height > 8000000 || int64(config.Width)*int64(config.Height) > 8000000 {
 		reject("截图必须是最多 800 万像素的 PNG", "invalid_png_dimensions")
 		return
 	}
@@ -106,6 +106,7 @@ func (s *Server) saveNoteImage(w http.ResponseWriter, r *http.Request) {
 	}
 	path := s.noteImagePath(document, annotation)
 	if ctx.Err() != nil {
+		s.diagnosticEvent(slog.LevelInfo, "note.image.cancelled", "requestId", requestID(r.Context()), "reasonCode", "document_task_cancelled")
 		fail(w, 409, "截图保存已取消")
 		return
 	}

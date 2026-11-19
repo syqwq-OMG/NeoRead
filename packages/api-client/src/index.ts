@@ -198,11 +198,17 @@ export type ChapterTranslationStatus =
   paths["/api/documents/{id}/translations/chapter-status"]["post"]["responses"]["200"]["content"]["application/json"];
 
 export const api = {
-  saveNoteImage: (documentId: string, annotationId: string, image: Blob) =>
+  saveNoteImage: (
+    documentId: string,
+    annotationId: string,
+    image: Blob,
+    signal?: AbortSignal,
+  ) =>
     request<{ saved: boolean }>(
       `/api/documents/${documentId}/annotations/${annotationId}/image`,
       {
         method: "PUT",
+        signal,
         headers: { "Content-Type": "image/png" },
         body: image,
       },
