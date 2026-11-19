@@ -446,6 +446,7 @@ export interface ReaderTheme {
   assistantCodeFontFamily?: string;
   annotationToolbarMode?: "docked" | "ball";
   annotationToolbarDock?: "top" | "bottom" | "left" | "right";
+  annotationBallPosition?: { x: number; y: number };
   assistantFontWeight?: "normal" | "bold";
   /** "sans-serif", "serif" or an installed font family name. */
   translationFontFamily?: string;

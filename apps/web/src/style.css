@@ -1214,9 +1214,75 @@ kbd {
   .color-swatches {
   flex-direction: column;
 }
+.pdf-annotation-tools[data-positioned="true"] {
+  --tool-inset: 22px;
+  top: clamp(
+    min(var(--tool-inset), 50%),
+    var(--tool-y),
+    max(50%, 100% - var(--tool-inset))
+  );
+  left: clamp(
+    min(var(--tool-inset), 50%),
+    var(--tool-x),
+    max(50%, 100% - var(--tool-inset))
+  );
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+}
+.pdf-annotation-tools[data-expanded="true"] {
+  --tool-inset: 80px;
+}
+.pdf-annotation-tools[data-ball="true"] .color-swatches {
+  flex-direction: row;
+}
+.annotation-drag-handle {
+  cursor: grab;
+  touch-action: none;
+}
+.annotation-drag-handle:active {
+  cursor: grabbing;
+}
+.annotation-radial-menu {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.annotation-radial-item {
+  position: absolute;
+  top: calc(50% + var(--radial-y) * 56px);
+  left: calc(50% + var(--radial-x) * 56px);
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  background-color: var(--popover);
+  box-shadow: 0 1px 5px #0002;
+}
+.annotation-radial-item[aria-pressed="true"] {
+  background-color: var(--accent);
+}
+.annotation-radial-colors {
+  position: absolute;
+  z-index: 1;
+  top: calc(50% + 74px);
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--popover);
+  pointer-events: auto;
+}
 .paper-note-rich img {
   max-width: 100%;
   height: auto;
+}
+.paper-note-rich
+  p:has(img[data-note-image]):has(+ p > [data-note-link][role="link"]) {
+  margin-bottom: 0;
+}
+.paper-note-rich
+  p:has(img[data-note-image])
+  + p:has(> [data-note-link][role="link"]) {
+  margin-top: 0;
 }
 .paper-note-rich [data-note-link][role="link"] {
   cursor: pointer;
