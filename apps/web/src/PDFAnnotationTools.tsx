@@ -11,7 +11,6 @@ import {
   Underline,
   SquareDashed,
   PanelTop,
-  PanelBottom,
   PanelLeft,
   PanelRight,
   CircleDot,
@@ -37,10 +36,12 @@ import { ColorSwatches } from "./ColorSwatches";
 import { useReaderStore } from "./store";
 import type { ReaderTheme } from "@neoread/core";
 export type AnnotationTool = "select" | "highlight" | "underline" | "region";
-export type AnnotationDock = "top" | "bottom" | "left" | "right";
+export type AnnotationDock = "top" | "left" | "right";
+const dockPosition = (
+  saved: ReaderTheme["annotationToolbarDock"],
+): AnnotationDock => (saved === "left" || saved === "right" ? saved : "top");
 const docks = [
   ["top", "顶部", PanelTop],
-  ["bottom", "底部", PanelBottom],
   ["left", "左侧", PanelLeft],
   ["right", "右侧", PanelRight],
 ] as const;
@@ -59,7 +60,7 @@ export function PDFAnnotationTools({
 }) {
   const theme = useReaderStore((state) => state.theme),
     setTheme = useReaderStore((state) => state.setTheme);
-  const dock = theme.annotationToolbarDock ?? "top";
+  const dock = dockPosition(theme.annotationToolbarDock);
   const floating = theme.annotationToolbarMode === "ball";
   const [expanded, setExpanded] = useState(false);
   const [showColors, setShowColors] = useState(false);
@@ -144,7 +145,6 @@ export function PDFAnnotationTools({
       const bounds = host.current!.parentElement!.getBoundingClientRect();
       const distances = [
         next.y * bounds.height,
-        (1 - next.y) * bounds.height,
         next.x * bounds.width,
         (1 - next.x) * bounds.width,
       ];
@@ -409,7 +409,7 @@ export function AnnotationToolbarSettings() {
             吸附位置
           </label>
           <Select
-            value={theme.annotationToolbarDock ?? "top"}
+            value={dockPosition(theme.annotationToolbarDock)}
             onValueChange={(value) =>
               setTheme({ annotationToolbarDock: value as AnnotationDock })
             }

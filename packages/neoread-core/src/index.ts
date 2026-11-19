@@ -447,6 +447,7 @@ export interface ReaderTheme {
   /** Chat code block font; unset uses the system monospace stack. */
   assistantCodeFontFamily?: string;
   annotationToolbarMode?: "docked" | "ball";
+  /** Legacy bottom docking is displayed at the top. */
   annotationToolbarDock?: "top" | "bottom" | "left" | "right";
   annotationBallPosition?: { x: number; y: number };
   assistantFontWeight?: "normal" | "bold";

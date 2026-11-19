@@ -17,7 +17,7 @@ it("keeps tool selection separate from persistent docking and menu mode", async 
   try {
     useReaderStore.getState().setTheme({
       annotationToolbarMode: "docked",
-      annotationToolbarDock: "top",
+        annotationToolbarDock: "bottom",
     });
     await act(async () =>
       root.render(
