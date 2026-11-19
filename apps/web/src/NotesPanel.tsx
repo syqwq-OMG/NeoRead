@@ -5,12 +5,10 @@ import { registerTabCloseGuard } from "./document-tab-guards";
 import {
   Check,
   ChevronDown,
-  Copy,
   CircleHelp,
   Download,
   Loader2,
   Pencil,
-  Search,
   Sparkles,
   StickyNote,
   Trash2,
@@ -22,6 +20,7 @@ import {
   type Message,
 } from "@neoread/core";
 import { Button } from "@neoread/ui/components/button";
+import { CopyButton } from "./CopyButton";
 import { PaperNoteRichEditor } from "./PaperNoteRichEditor";
 import { MessageMarkdown } from "./chat/MessageMarkdown";
 import { ScrollArea } from "@neoread/ui/components/scroll-area";
@@ -113,8 +112,13 @@ function NoteCard({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(a.note);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const closeState = useRef({ editing, saving, changed: false });
-  closeState.current = { editing, saving, changed: draft !== a.note };
+  closeState.current = {
+    editing,
+    saving,
+    changed: draft !== a.note || uploading,
+  };
   useEffect(
     () =>
       registerTabCloseGuard(a.documentId, () =>
@@ -143,23 +147,16 @@ function NoteCard({
             <Pencil />
           </Button>
         )}
-        <Button
-          size="icon-xs"
-          variant="ghost"
-          aria-label="复制"
-          title="复制原文和批注内容"
-          onClick={() =>
-            void copyText(
+        <CopyButton
+          onCopy={() =>
+            copyText(
               [a.quote || locationLabel(a.location), a.note]
                 .map((part) => part.trim())
                 .filter(Boolean)
                 .join("\n\n"),
-              "已复制",
             )
           }
-        >
-          <Copy />
-        </Button>
+        />
         <Button
           size="icon-xs"
           variant="destructive-ghost"
@@ -204,6 +201,7 @@ function NoteCard({
           }}
         >
           <PaperNoteRichEditor
+            documentId={a.documentId}
             body={draft}
             disabled={saving}
             ariaLabel={question ? "问题" : "批注"}
@@ -212,34 +210,35 @@ function NoteCard({
             className="annotation-markdown-editor"
             diagnosticScope="annotation_note"
             onChange={setDraft}
+            onUploadingChange={setUploading}
+            toolbarPlacement="bottom"
+            actions={
+              <Button
+                size="icon-sm"
+                className="rounded-full"
+                aria-label="保存"
+                title="保存"
+                disabled={saving || uploading || (question && !draft.trim())}
+                onClick={() => {
+                  setSaving(true);
+                  void onSave(draft)
+                    .then((ok) => ok && setEditing(false))
+                    .finally(() => setSaving(false));
+                }}
+              >
+                <Check className="size-3.5" />
+              </Button>
+            }
           />
-          <div className="grid grid-cols-2 gap-1">
-            <Button
-              size="xs"
-              variant="ghost"
-              disabled={saving}
-              onClick={() => setEditing(false)}
-            >
-              取消
-            </Button>
-            <Button
-              size="xs"
-              disabled={saving || (question && !draft.trim())}
-              onClick={() => {
-                setSaving(true);
-                void onSave(draft)
-                  .then((ok) => ok && setEditing(false))
-                  .finally(() => setSaving(false));
-              }}
-            >
-              <Check />
-              保存
-            </Button>
-          </div>
         </div>
       ) : (
         a.note && (
-          <MessageMarkdown content={a.note} animated={false} literalHtml />
+          <MessageMarkdown
+            content={a.note}
+            animated={false}
+            literalHtml
+            noteImages
+          />
         )
       )}
       {question && !editing && (
@@ -366,16 +365,14 @@ export function NotesPanel({
             ))}
           </TabsList>
         </Tabs>
-        <div className="notes-search">
-          <Search aria-hidden="true" />
-          <SearchInput
-            aria-label="搜索批注内容"
-            placeholder="搜索批注内容"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            onClear={() => setSearch("")}
-          />
-        </div>
+        <SearchInput
+          icon
+          aria-label="搜索批注内容"
+          placeholder="搜索批注内容"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          onClear={() => setSearch("")}
+        />
       </div>
       <ScrollArea className="min-h-0 flex-1">
         <div className="notes-list">

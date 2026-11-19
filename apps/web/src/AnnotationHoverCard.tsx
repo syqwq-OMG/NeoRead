@@ -28,6 +28,8 @@ import {
 /** Adds or edits a note/question inside the annotation card. */
 export interface AnnotationNoteEditor {
   anchor: SelectionAnchor;
+  /** Document whose attachments receive pasted images. */
+  documentId: string;
   kind: "note" | "question";
   /** Whether an existing annotation is being edited. */
   editing: boolean;
@@ -183,9 +185,12 @@ export function AnnotationHoverCard({
     </CardButton>
   );
 
+  const [uploading, setUploading] = useState(false);
+  // Saving closes the card; wait until pasted images are in the Markdown.
   const canSave =
     !!editor &&
     !editor.saving &&
+    !uploading &&
     (editor.kind === "question"
       ? !!editor.value.trim()
       : !!editor.value.trim() || !!editor.initial.trim());
@@ -278,6 +283,7 @@ export function AnnotationHoverCard({
               }}
             >
               <PaperNoteRichEditor
+                documentId={editor.documentId}
                 body={editor.value}
                 disabled={editor.saving}
                 ariaLabel={title}
@@ -288,7 +294,9 @@ export function AnnotationHoverCard({
                 className="annotation-markdown-editor"
                 diagnosticScope="annotation_note"
                 onChange={editor.onChange}
+                onUploadingChange={setUploading}
                 leading={grip}
+                toolbarPlacement="bottom"
                 actions={
                   <>
                     {editor.kind === "question" && !editor.editing && (
@@ -303,6 +311,7 @@ export function AnnotationHoverCard({
                     <CardButton
                       label="保存"
                       variant="default"
+                      className="rounded-full"
                       disabled={!canSave}
                       onClick={editor.onSave}
                     >
@@ -317,12 +326,14 @@ export function AnnotationHoverCard({
             notes.map((annotation, index) => (
               <div
                 key={annotation.id}
-                className="border-b pb-2 last:border-0 last:pb-0"
+                // Inset text to the icon edge of the 28px ghost buttons below.
+                className="border-b pb-2 last:border-0 last:pb-0 [&>.message-markdown]:px-[7px]"
               >
                 <MessageMarkdown
                   content={annotation.note}
                   animated={false}
                   literalHtml
+                  noteImages
                 />
                 <div className="mt-1 flex items-center gap-1">
                   {index === 0 && grip}

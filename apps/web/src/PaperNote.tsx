@@ -5,13 +5,12 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { ListPlus, Maximize2 } from "lucide-react";
+import { Check, ListPlus, Maximize2 } from "lucide-react";
 import { neoreadLink, type Annotation } from "@neoread/core";
 import { Button } from "@neoread/ui/components/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -20,6 +19,7 @@ import { annotationDigest } from "./notes-export";
 import { registerTabCloseGuard } from "./document-tab-guards";
 import { getPaperNote } from "./paper-note-state";
 import { PaperNoteRichEditor } from "./PaperNoteRichEditor";
+import { appendNoteMarkdown } from "./note-images";
 
 const statusLabels = {
   loading: "读取中…",
@@ -47,6 +47,7 @@ export function PaperNote({
   );
   const [expanded, setExpanded] = useState(false);
   const expandButton = useRef<HTMLButtonElement>(null);
+  const uploads = useRef(0);
   const unavailable = status === "loading" || status === "load-error";
   useEffect(() => {
     void note.load().catch(() => {});
@@ -61,13 +62,26 @@ export function PaperNote({
       registerTabCloseGuard(documentId, () =>
         note.getSnapshot().status === "saving"
           ? { blocked: true, message: "论文笔记正在保存，请保存完成后再关闭。" }
-          : note.hasPending()
-            ? { message: "论文笔记还有未保存的修改，关闭后可能丢失。" }
-            : null,
+          : uploads.current
+            ? { message: "论文笔记中的图片仍在上传，关闭后可能丢失。" }
+            : note.hasPending()
+              ? { message: "论文笔记还有未保存的修改，关闭后可能丢失。" }
+              : null,
       ),
     [documentId, note],
   );
   const save = () => void note.flush().catch(() => {});
+  // Expanding or collapsing swaps editors; an upload outlives the one it began in.
+  const imageProps = {
+    documentId,
+    onUploadingChange: (uploading: boolean) => {
+      uploads.current += uploading ? 1 : -1;
+    },
+    onOrphanedImage: (markdown: string) => {
+      note.edit(appendNoteMarkdown(note.getSnapshot().body, markdown));
+      save();
+    },
+  };
   const digest = unavailable
     ? ""
     : annotationDigest(annotations, body, (a) =>
@@ -127,13 +141,15 @@ export function PaperNote({
           <PaperNoteRichEditor
             onOpenReference={onOpenReference}
             key={documentId}
+            {...imageProps}
             body={body}
             disabled={unavailable}
             onChange={note.edit}
             onBlur={save}
+            besideTabs={excerpt}
             actions={
               <>
-                {excerpt}
+                {feedback}
                 <DialogTrigger
                   render={
                     <Button
@@ -147,29 +163,56 @@ export function PaperNote({
                 >
                   <Maximize2 />
                 </DialogTrigger>
+                <Button
+                  size="icon-sm"
+                  className="rounded-full"
+                  aria-label="保存"
+                  title="保存"
+                  disabled={unavailable}
+                  onClick={save}
+                >
+                  <Check className="size-3.5" />
+                </Button>
               </>
             }
+            toolbarPlacement="bottom"
           />
         )}
-        {!expanded && feedback}
       </div>
       <DialogContent className="paper-note-dialog" finalFocus={expandButton}>
         <DialogHeader>
           <DialogTitle>论文笔记</DialogTitle>
-          <DialogDescription>Markdown 笔记</DialogDescription>
         </DialogHeader>
         {expanded && active && (
           <PaperNoteRichEditor
             onOpenReference={onOpenReference}
             key={documentId}
+            {...imageProps}
             body={body}
             disabled={unavailable}
             onChange={note.edit}
             onBlur={save}
-            actions={excerpt}
+            besideTabs={excerpt}
+            actions={
+              <>
+                {feedback}
+                <Button
+                  size="icon-sm"
+                  className="rounded-full"
+                  aria-label="保存并收起"
+                  title="保存并收起"
+                  onClick={() => {
+                    save();
+                    setExpanded(false);
+                  }}
+                >
+                  <Check className="size-3.5" />
+                </Button>
+              </>
+            }
+            toolbarPlacement="bottom"
           />
         )}
-        {feedback}
       </DialogContent>
     </Dialog>
   );

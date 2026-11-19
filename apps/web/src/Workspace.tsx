@@ -476,6 +476,13 @@ export function Workspace({
   const [quotes, setQuotes] = useState<ReaderSelection[]>([]);
   const [images, setImages] = useState<ImageAttachment[]>([]);
   const [previewImage, setPreviewImage] = useState<ImageAttachment>();
+  const renderPreviewImage = useMemo(
+    () =>
+      previewImage && renderBlockImage
+        ? (signal: AbortSignal) => renderBlockImage(previewImage.id, signal)
+        : undefined,
+    [previewImage, renderBlockImage],
+  );
   const composeInput = useRef<HTMLTextAreaElement>(null);
   const composerDrafts = useRef(
     new Map<
@@ -1211,7 +1218,7 @@ export function Workspace({
           { type: "pdf", page: block.page, rects: [block.bounds] },
           (block.caption || block.text).trim(),
         );
-      else void copyText(block.text.trim(), "已复制");
+      else void copyText(block.text.trim());
       return;
     }
     if (!block.image) {
@@ -1581,35 +1588,27 @@ export function Workspace({
               </TabsContent>
               <TabsContent
                 value="search"
-                className="relative flex min-h-0 flex-1 flex-col gap-3 p-3"
+                className="sidebar-search-panel relative flex min-h-0 flex-1 flex-col gap-3 p-3"
               >
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    void search();
+                    if (!searching) void search();
                   }}
-                  className="flex shrink-0 gap-1"
+                  className="shrink-0"
                 >
                   <SearchInput
+                    icon
                     aria-label="搜索文档"
                     ref={searchInput}
-                    wrapperClassName="flex-1"
-                    placeholder="搜索文档内容…"
+                    placeholder="搜索文档内容"
                     value={query}
                     onChange={(e) => updateSearchQuery(e.target.value)}
                     onClear={() => updateSearchQuery("")}
                   />
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    disabled={searching}
-                    aria-label="搜索"
-                  >
-                    <Search />
-                  </Button>
                 </form>
                 <ScrollArea className="min-h-0 flex-1">
-                  <div className="pb-12">
+                  <div className="sidebar-search-results pb-12">
                     {results.map((result) => (
                       <Button
                         key={result.id}
@@ -2140,6 +2139,7 @@ export function Workspace({
           active && noteAnchor
             ? {
                 anchor: noteAnchor,
+                documentId: doc.id,
                 kind: noteKind,
                 editing: !!editingAnnotation,
                 initial: editingAnnotation?.note ?? "",
@@ -2177,9 +2177,10 @@ export function Workspace({
       {active && previewImage && (
         <ImagePreview
           key={previewImage.id}
-          documentId={doc.id}
-          image={previewImage}
-          renderImage={renderBlockImage}
+          title={imageLabel(previewImage)}
+          alt={previewImage.caption || imageLabel(previewImage)}
+          src={blockImageURL(doc.id, previewImage.id)}
+          render={renderPreviewImage}
           onClose={() => setPreviewImage(undefined)}
         />
       )}

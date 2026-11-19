@@ -1,4 +1,9 @@
-import { locationLabel, neoreadLink, type Annotation } from "@neoread/core";
+import {
+  locationLabel,
+  neoreadLink,
+  parseNeoReadLink,
+  type Annotation,
+} from "@neoread/core";
 import { getPaperNote } from "./paper-note-state";
 import { copyText } from "./chat/clipboard";
 
@@ -9,6 +14,21 @@ export function parseNoteImage(source: string) {
     source,
   );
   return match ? { documentId: match[1], annotationId: match[2] } : undefined;
+}
+export function isLinkedImageExcerpt(text: string) {
+  const image = text.match(
+    /\]\((neoread-note-image:\/\/[0-9a-f]{32}\/[0-9a-f]{32})\)/,
+  )?.[1];
+  if (!image) return false;
+  const source = parseNoteImage(image);
+  const link = text.match(/\]\((neoread:\/\/open\?[^\s)]+)\)/)?.[1];
+  const target = link && parseNeoReadLink(link);
+  return (
+    !!source &&
+    !!target &&
+    target.id === source.documentId &&
+    target.annotation === source.annotationId
+  );
 }
 const escape = (text: string) => text.replace(/[\\`*_[\]<>&]/g, "\\$&");
 export function excerptMarkdown(

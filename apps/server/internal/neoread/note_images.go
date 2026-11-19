@@ -1,139 +1,177 @@
 package neoread
 
 import (
-	"bytes"
-	"encoding/json"
-	"image/png"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
+	"time"
 )
 
-var noteAssetID = regexp.MustCompile(`^[0-9a-f]{32}$`)
-
-func (s *Server) copyNoteImages(body, from, to string) (string, error) {
-	prefix := "neoread-note-image://" + from + "/"
-	refs := regexp.MustCompile(regexp.QuoteMeta(prefix)+`([0-9a-f]{32})`).FindAllStringSubmatch(body, -1)
-	for _, ref := range refs {
-		data, err := os.ReadFile(s.noteImagePath(from, ref[1]))
-		if err != nil {
-			return "", err
-		}
-		target := s.noteImagePath(to, ref[1])
-		if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
-			return "", err
-		}
-		if err := os.WriteFile(target, data, 0600); err != nil {
-			return "", err
-		}
+func (s *Server) activeNoteImageDocument(w http.ResponseWriter, documentID string) bool {
+	var active bool
+	err := s.Store.DB.QueryRow("SELECT deleted_at='' FROM documents WHERE id=?", documentID).Scan(&active)
+	if errors.Is(err, sql.ErrNoRows) || err == nil && !active {
+		fail(w, 404, "文档不存在或已在回收站中")
+		return false
 	}
-	return strings.ReplaceAll(body, prefix, "neoread-note-image://"+to+"/"), nil
+	if err != nil {
+		fail(w, 500, "无法读取文档")
+		return false
+	}
+	return true
 }
 
-// Assets belong to the paper, not its cache. Keep them after annotation deletion
-// because an existing note or annotation undo may still refer to the snapshot.
-func (s *Server) noteImagePath(document, annotation string) string {
-	return filepath.Join(s.Store.Root, "note-assets", document, annotation+".png")
-}
-func (s *Server) serveNoteImage(w http.ResponseWriter, r *http.Request, document, annotation string) {
-	if !noteAssetID.MatchString(document) || !noteAssetID.MatchString(annotation) {
-		http.NotFound(w, r)
+func (s *Server) uploadNoteImage(w http.ResponseWriter, r *http.Request) {
+	documentID := r.PathValue("id")
+	if !s.activeNoteImageDocument(w, documentID) {
 		return
 	}
-	if _, err := s.Store.Document(document); err != nil {
-		http.NotFound(w, r)
+	if r.ContentLength > maxNoteImageBytes {
+		fail(w, 413, "笔记图片不能超过 10 MiB")
 		return
 	}
-	w.Header().Set("Content-Type", "image/png")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	http.ServeFile(w, r, s.noteImagePath(document, annotation))
-}
-func (s *Server) saveNoteImage(w http.ResponseWriter, r *http.Request) {
-	reject := func(message, reason string) {
-		s.diagnosticEvent(slog.LevelError, "note.image.rejected", "requestId", requestID(r.Context()), "reasonCode", reason)
+	storageFailure := func(phase string) {
+		s.diagnosticEvent(slog.LevelError, "note_image.upload_failed", "requestId", requestID(r.Context()), "errorCode", "storage", "phase", phase)
+		fail(w, 500, "无法保存笔记图片")
+	}
+	cancelled := func() {
+		s.diagnosticEvent(slog.LevelInfo, "note_image.upload_cancelled", "requestId", requestID(r.Context()), "reasonCode", "request_cancelled")
+		fail(w, 400, "图片上传已取消")
+	}
+	temp, err := os.CreateTemp(filepath.Join(s.Store.Root, "attachments"), ".note-image-*")
+	if err != nil {
+		storageFailure("create_temp")
+		return
+	}
+	defer os.Remove(temp.Name())
+	defer temp.Close()
+	r.Body = http.MaxBytesReader(w, r.Body, maxNoteImageBytes)
+	digest := sha256.New()
+	size, err := io.Copy(io.MultiWriter(temp, digest), r.Body)
+	var tooLarge *http.MaxBytesError
+	var fileError *os.PathError
+	switch {
+	case errors.As(err, &tooLarge):
+		fail(w, 413, "笔记图片不能超过 10 MiB")
+		return
+	case r.Context().Err() != nil:
+		cancelled()
+		return
+	case errors.As(err, &fileError):
+		storageFailure("write_temp")
+		return
+	case err != nil:
+		fail(w, 400, "图片上传未完成")
+		return
+	}
+	ext, err := validateNoteImage(temp, size)
+	if errors.Is(err, errNoteImageFormat) {
+		fail(w, 415, "仅支持 PNG、JPEG、WebP 和 GIF 图片")
+		return
+	}
+	if err != nil {
+		reason, message := "malformed_raster", "图片损坏或内容不完整"
+		switch err {
+		case errNoteImageBounds:
+			reason, message = "raster_bounds", "图片尺寸或动画帧数超过限制"
+		case errNoteImageMotion:
+			reason, message = "unsupported_animation", "动画图片只支持 GIF 格式"
+		}
+		s.diagnosticEvent(slog.LevelError, "note_image.upload_rejected", "requestId", requestID(r.Context()), "errorCode", "invalid_image", "reasonCode", reason)
 		fail(w, 400, message)
-	}
-	document, annotation := r.PathValue("id"), r.PathValue("annotation")
-	if !noteAssetID.MatchString(document) || !noteAssetID.MatchString(annotation) {
-		fail(w, 400, "截图编号无效")
 		return
 	}
-	d, err := s.Store.Document(document)
+	if err = temp.Sync(); err == nil {
+		err = temp.Close()
+	}
 	if err != nil {
-		fail(w, 404, "文档不存在")
+		storageFailure("close_temp")
 		return
 	}
-	ctx, finish, err := s.beginDocumentTask(r.Context(), document)
-	if err != nil {
-		fail(w, 409, "文档不可写")
+	hash := hex.EncodeToString(digest.Sum(nil))
+	s.importMu.Lock()
+	defer s.importMu.Unlock()
+	if r.Context().Err() != nil {
+		cancelled()
 		return
 	}
-	defer finish()
-	var raw string
-	if err := s.Store.DB.QueryRow("SELECT body FROM annotations WHERE id=? AND document_id=?", annotation, document).Scan(&raw); err != nil {
-		fail(w, 404, "来源批注不存在")
+	if !s.activeNoteImageDocument(w, documentID) {
 		return
 	}
-	var saved Annotation
-	if json.Unmarshal([]byte(raw), &saved) != nil {
-		fail(w, 500, "来源批注无效")
+	defer s.Store.cleanupAttachmentFile(hash)
+	if err = s.Store.publishAttachmentBlob(temp.Name(), hash, size); err != nil {
+		storageFailure("publish_blob")
 		return
 	}
-	var location struct {
-		Region bool `json:"region"`
-	}
-	if saved.Kind != "note" || !validLocation(saved.Location, d.Type) ||
-		json.Unmarshal(saved.Location, &location) != nil || (!location.Region && saved.SourceImageID == "") {
-		fail(w, 400, "图片来源位置无效")
-		return
-	}
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 8<<20))
-	if err != nil {
-		reject("截图不得超过 8 MiB", "body_limit")
-		return
-	}
-	config, err := png.DecodeConfig(bytes.NewReader(data))
-	if err != nil || config.Width < 1 || config.Height < 1 || config.Width > 8000000 || config.Height > 8000000 || int64(config.Width)*int64(config.Height) > 8000000 {
-		reject("截图必须是最多 800 万像素的 PNG", "invalid_png_dimensions")
-		return
-	}
-	if _, err := png.Decode(bytes.NewReader(data)); err != nil {
-		reject("截图 PNG 无效", "invalid_png_data")
-		return
-	}
-	path := s.noteImagePath(document, annotation)
-	if ctx.Err() != nil {
-		s.diagnosticEvent(slog.LevelInfo, "note.image.cancelled", "requestId", requestID(r.Context()), "reasonCode", "document_task_cancelled")
-		fail(w, 409, "截图保存已取消")
-		return
-	}
-	if err = os.MkdirAll(filepath.Dir(path), 0700); err == nil {
-		var file *os.File
-		file, err = os.CreateTemp(filepath.Dir(path), ".snapshot-*.tmp")
+	tx, err := s.Store.DB.BeginTx(r.Context(), nil)
+	if err == nil {
+		defer tx.Rollback()
+		_, err = tx.Exec("INSERT OR IGNORE INTO note_image_blobs VALUES(?,?)", hash, ext)
 		if err == nil {
-			defer os.Remove(file.Name())
-			_, err = file.Write(data)
-			if closeErr := file.Close(); err == nil {
-				err = closeErr
-			}
-			if err == nil {
-				if _, exists := os.Stat(path); os.IsNotExist(exists) {
-					err = os.Rename(file.Name(), path)
-				} else if exists != nil {
-					err = exists
-				}
-			}
+			_, err = tx.Exec("INSERT OR IGNORE INTO note_image_pins VALUES(?,?)", documentID, hash)
+		}
+		if err == nil {
+			err = tx.Commit()
 		}
 	}
 	if err != nil {
-		s.diagnosticEvent(slog.LevelError, "note.image.save_failed", "requestId", requestID(r.Context()), "documentId", document, "reasonCode", "file_write_failed")
-		fail(w, 500, "截图保存失败，区域批注已保留，可重新复制")
+		if r.Context().Err() != nil {
+			cancelled()
+		} else {
+			storageFailure("pin_blob")
+		}
 		return
 	}
-	s.diagnosticEvent(slog.LevelInfo, "note.image.saved", "requestId", requestID(r.Context()), "documentId", document, "bytes", len(data))
-	respond(w, 200, map[string]bool{"saved": true})
+	respond(w, 201, map[string]string{"path": "assets/" + hash + "." + ext})
+}
+
+func parseNoteImageName(name string) (hash, ext string, ok bool) {
+	hash, ext, ok = strings.Cut(name, ".")
+	return hash, ext, ok && validAttachmentBlobHash(hash) && noteImageContentType(ext) != ""
+}
+
+// openNoteImage also supplies portable exports with an immutable snapshot of
+// the bytes. Its caller must close the file with closeAttachmentBlob.
+func (s *Server) openNoteImage(name string) (*os.File, string, error) {
+	hash, ext, ok := parseNoteImageName(name)
+	if !ok {
+		return nil, "", os.ErrNotExist
+	}
+	s.importMu.Lock()
+	defer s.importMu.Unlock()
+	var storedExt string
+	err := s.Store.DB.QueryRow("SELECT extension FROM note_image_blobs WHERE sha256=?", hash).Scan(&storedExt)
+	if errors.Is(err, sql.ErrNoRows) || err == nil && ext != storedExt {
+		return nil, "", os.ErrNotExist
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	f, err := s.Store.openAttachmentBlob(hash)
+	return f, noteImageContentType(ext), err
+}
+
+func (s *Server) downloadNoteImage(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	f, mediaType, err := s.openNoteImage(name)
+	if errors.Is(err, os.ErrNotExist) {
+		fail(w, 404, "笔记图片不存在")
+		return
+	}
+	if err != nil {
+		fail(w, 500, "无法读取笔记图片")
+		return
+	}
+	defer s.closeAttachmentBlob(f)
+	w.Header().Set("Content-Type", mediaType)
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	http.ServeContent(w, r, name, time.Time{}, f)
 }
