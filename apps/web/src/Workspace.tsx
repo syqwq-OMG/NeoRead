@@ -1518,8 +1518,10 @@ export function Workspace({
           </IconButton>
         </div>
       </header>
+      {/* Keep the PDF and chat widths stable while the pointer moves. */}
       <ResizablePanelGroup
         orientation="horizontal"
+        resizePreviewMode="separator"
         className="neoread-panels"
         elementRef={panelGroup}
         defaultLayout={initialLayout.current}
