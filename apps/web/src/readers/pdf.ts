@@ -118,7 +118,9 @@ export class PDFReaderAdapter implements ReaderAdapter {
     private events: ReaderEvents,
   ) {
     container.classList.add("pdf-container");
-    this.regionTool = new PDFRegionTool(container);
+    this.regionTool = new PDFRegionTool(container, (event) =>
+      this.annotationLayer.activateRegion(event),
+    );
     this.removeExternalLinks = installPDFExternalLinks(container);
     this.figureLinks = new PDFFigureLinks(
       container,

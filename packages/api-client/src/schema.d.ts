@@ -45,7 +45,7 @@ export interface paths {
                 };
             };
         };
-        /** Save an immutable PNG snapshot for a PDF region annotation */
+        /** Save an immutable PNG snapshot for a region or original figure annotation */
         put: {
             parameters: {
                 query?: never;
@@ -73,7 +73,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Invalid image, missing region, or persistence failure */
+                /** @description Invalid image, missing annotation, or persistence failure */
                 default: {
                     headers: {
                         [name: string]: unknown;
@@ -5455,6 +5455,8 @@ export interface components {
         };
         Annotation: {
             id: string;
+            /** @description Original figure referenced by an excerpt. */
+            sourceImageId?: string;
             documentId: string;
             /** @enum {unknown} */
             kind: "highlight" | "underline" | "note" | "question" | "bookmark";

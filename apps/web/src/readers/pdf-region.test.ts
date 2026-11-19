@@ -20,7 +20,8 @@ it("captures a region and cancels drafts without leaving event handlers", () => 
   page.setPointerCapture = vi.fn();
   page.hasPointerCapture = () => true;
   page.releasePointerCapture = vi.fn();
-  const tool = new PDFRegionTool(host),
+  const tapped = vi.fn();
+  const tool = new PDFRegionTool(host, tapped),
     selected = vi.fn();
   tool.set(true, selected);
   const send = (type: string, x: number, y: number) =>
@@ -49,6 +50,10 @@ it("captures a region and cancels drafts without leaving event handlers", () => 
     send("pointerdown", 20, 40);
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(host.querySelector(".pdf-region-draft")).toBeNull();
+    expect(selected).toHaveBeenCalledTimes(1);
+    send("pointerdown", 20, 40);
+    send("pointerup", 20, 40);
+    expect(tapped).toHaveBeenCalledTimes(1);
     expect(selected).toHaveBeenCalledTimes(1);
     tool.destroy();
     send("pointerdown", 20, 40);

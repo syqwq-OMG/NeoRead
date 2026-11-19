@@ -81,6 +81,38 @@ func TestRegionGeometryRejectsInvalidRectangles(t *testing.T) {
 	}
 }
 
+func TestOriginalFigureCanBeStoredAsANoteImage(t *testing.T) {
+	s := testServer(t)
+	w := upload(t, s, "figure.pdf", testPDF(1))
+	if w.Code != 201 {
+		t.Fatal(w.Body.String())
+	}
+	var d Document
+	if err := json.Unmarshal(w.Body.Bytes(), &d); err != nil {
+		t.Fatal(err)
+	}
+	annotations := "/api/documents/" + d.ID + "/annotations"
+	w = request(t, s, "POST", annotations, strings.NewReader(`{"kind":"note","sourceImageId":"p1-b1","location":{"type":"pdf","page":1},"quote":"Figure 1"}`))
+	if w.Code != 201 {
+		t.Fatal(w.Body.String())
+	}
+	var a Annotation
+	if err := json.Unmarshal(w.Body.Bytes(), &a); err != nil || a.SourceImageID != "p1-b1" {
+		t.Fatal("missing original figure reference", err)
+	}
+	var pngData bytes.Buffer
+	if err := png.Encode(&pngData, image.NewRGBA(image.Rect(0, 0, 12, 12))); err != nil {
+		t.Fatal(err)
+	}
+	asset := annotations + "/" + a.ID + "/image"
+	if w = request(t, s, "PUT", asset, bytes.NewReader(pngData.Bytes())); w.Code != 200 {
+		t.Fatal(w.Body.String())
+	}
+	if w = request(t, s, "GET", asset, nil); w.Code != 200 || !bytes.Equal(w.Body.Bytes(), pngData.Bytes()) {
+		t.Fatal("original figure snapshot unavailable")
+	}
+}
+
 func TestMergedNoteSnapshotsAreCopiedToTheSurvivingPaper(t *testing.T) {
 	s := testServer(t)
 	from, to, asset := strings.Repeat("a", 32), strings.Repeat("b", 32), strings.Repeat("c", 32)

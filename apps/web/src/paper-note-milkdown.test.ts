@@ -5,13 +5,23 @@ import { TextSelection } from "@milkdown/kit/prose/state";
 import { closeHistory } from "@milkdown/kit/prose/history";
 import { Slice, DOMParser, DOMSerializer } from "@milkdown/kit/prose/model";
 import { createPaperNoteEditor } from "./paper-note-milkdown";
+import { excerptMarkdown } from "./note-excerpts";
+import type { Annotation } from "@neoread/core";
 
 const editors: Awaited<ReturnType<typeof createPaperNoteEditor>>[] = [];
 
 it("pastes stored region screenshots with a keyboard-accessible source backlink", async () => {
   const documentId = "a".repeat(32),
     annotationId = "b".repeat(32);
-  const markdown = `![区域截图](neoread-note-image://${documentId}/${annotationId})\n\n[第 2 页 · 原文](neoread://open?id=${documentId}&annotation=${annotationId})`;
+  const markdown = excerptMarkdown(
+    {
+      documentId,
+      id: annotationId,
+      quote: "图 1",
+      location: { type: "pdf", page: 2 },
+    } as Annotation,
+    true,
+  );
   const open = vi.fn(() => true);
   const { view, editor, change } = await create("", vi.fn(), {
     onOpenReference: open,
@@ -44,6 +54,7 @@ it("pastes stored region screenshots with a keyboard-accessible source backlink"
     DOMParser.fromSchema(view.state.schema).parse(clipboard).toJSON(),
   ).toEqual(view.state.doc.toJSON());
   const link = view.dom.querySelector<HTMLElement>("[data-note-link]")!;
+  expect(image.closest("p")).toBe(link.closest("p"));
   expect(link.tabIndex).toBe(0);
   change.mockClear();
   link.dispatchEvent(new MouseEvent("click", { bubbles: true }));

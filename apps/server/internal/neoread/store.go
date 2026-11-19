@@ -40,14 +40,15 @@ type Document struct {
 	Percentage   float64         `json:"percentage"`
 }
 type Annotation struct {
-	ID         string          `json:"id"`
-	DocumentID string          `json:"documentId"`
-	Kind       string          `json:"kind"`
-	Location   json.RawMessage `json:"location"`
-	Quote      string          `json:"quote"`
-	Note       string          `json:"note"`
-	Color      string          `json:"color"`
-	CreatedAt  string          `json:"createdAt"`
+	SourceImageID string          `json:"sourceImageId,omitempty"`
+	ID            string          `json:"id"`
+	DocumentID    string          `json:"documentId"`
+	Kind          string          `json:"kind"`
+	Location      json.RawMessage `json:"location"`
+	Quote         string          `json:"quote"`
+	Note          string          `json:"note"`
+	Color         string          `json:"color"`
+	CreatedAt     string          `json:"createdAt"`
 	// AnswerID links a question to the chat message that answers it.
 	AnswerID string `json:"answerId,omitempty"`
 	Resolved bool   `json:"resolved,omitempty"`

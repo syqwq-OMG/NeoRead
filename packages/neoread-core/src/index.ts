@@ -336,6 +336,8 @@ export interface TOCItem {
 }
 export interface Annotation {
   id: string;
+  /** The original figure this note image refers to. */
+  sourceImageId?: string;
   documentId: string;
   kind: "highlight" | "underline" | "note" | "question" | "bookmark";
   location: DocumentLocation;

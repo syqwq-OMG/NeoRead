@@ -734,7 +734,7 @@ export const api = {
     id: string,
     annotation: Pick<
       Annotation,
-      "kind" | "location" | "quote" | "note" | "color"
+      "kind" | "location" | "quote" | "note" | "color" | "sourceImageId"
     >,
   ) =>
     annotationRequest<components["schemas"]["SavedAnnotation"]>(

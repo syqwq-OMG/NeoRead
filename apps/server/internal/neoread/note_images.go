@@ -63,8 +63,8 @@ func (s *Server) saveNoteImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d, err := s.Store.Document(document)
-	if err != nil || d.Type != "pdf" {
-		fail(w, 404, "PDF 不存在")
+	if err != nil {
+		fail(w, 404, "文档不存在")
 		return
 	}
 	ctx, finish, err := s.beginDocumentTask(r.Context(), document)
@@ -75,19 +75,20 @@ func (s *Server) saveNoteImage(w http.ResponseWriter, r *http.Request) {
 	defer finish()
 	var raw string
 	if err := s.Store.DB.QueryRow("SELECT body FROM annotations WHERE id=? AND document_id=?", annotation, document).Scan(&raw); err != nil {
-		fail(w, 404, "区域批注不存在")
+		fail(w, 404, "来源批注不存在")
 		return
 	}
 	var saved Annotation
 	if json.Unmarshal([]byte(raw), &saved) != nil {
-		fail(w, 500, "区域批注无效")
+		fail(w, 500, "来源批注无效")
 		return
 	}
 	var location struct {
 		Region bool `json:"region"`
 	}
-	if json.Unmarshal(saved.Location, &location) != nil || !location.Region {
-		fail(w, 400, "不是区域批注")
+	if saved.Kind != "note" || !validLocation(saved.Location, d.Type) ||
+		json.Unmarshal(saved.Location, &location) != nil || (!location.Region && saved.SourceImageID == "") {
+		fail(w, 400, "图片来源位置无效")
 		return
 	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 8<<20))

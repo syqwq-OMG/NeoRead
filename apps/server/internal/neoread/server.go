@@ -833,6 +833,10 @@ func (s *Server) saveAnnotation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.ID = id()
+	if a.SourceImageID != "" && (a.Kind != "note" || !(d.Type == "pdf" && blockIDPattern.MatchString(a.SourceImageID) || d.Type == "epub" && epubBlockIDPattern.MatchString(a.SourceImageID))) {
+		fail(w, 400, "原文图片编号无效")
+		return
+	}
 	a.DocumentID = d.ID
 	a.CreatedAt = now()
 	a.AnswerID, a.Resolved = "", false

@@ -10,7 +10,7 @@
           { "name": "annotation", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^[0-9a-f]{32}$" } }
         ],
         "get": { "summary": "Read a paper-owned note screenshot", "responses": { "200": { "description": "PNG screenshot", "content": { "image/png": { "schema": { "type": "string", "format": "binary" } } } }, "default": { "description": "Not found or unauthorized" } } },
-        "put": { "summary": "Save an immutable PNG snapshot for a PDF region annotation", "requestBody": { "required": true, "content": { "image/png": { "schema": { "type": "string", "format": "binary", "description": "At most 8 MiB and 8 million pixels" } } } }, "responses": { "200": { "description": "Saved", "content": { "application/json": { "schema": { "type": "object", "required": ["saved"], "properties": { "saved": { "type": "boolean" } } } } } }, "default": { "description": "Invalid image, missing region, or persistence failure" } } }
+        "put": { "summary": "Save an immutable PNG snapshot for a region or original figure annotation", "requestBody": { "required": true, "content": { "image/png": { "schema": { "type": "string", "format": "binary", "description": "At most 8 MiB and 8 million pixels" } } } }, "responses": { "200": { "description": "Saved", "content": { "application/json": { "schema": { "type": "object", "required": ["saved"], "properties": { "saved": { "type": "boolean" } } } } } }, "default": { "description": "Invalid image, missing annotation, or persistence failure" } } }
       },
       "/api/documents/{id}/navigation":
         {
@@ -6464,6 +6464,7 @@
               "properties":
                 {
                   "id": { "type": "string" },
+                  "sourceImageId": { "type": "string", "description": "Original figure referenced by an excerpt." },
                   "documentId": { "type": "string" },
                   "kind":
                     {

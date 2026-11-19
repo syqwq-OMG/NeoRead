@@ -1,6 +1,13 @@
 import type { RefObject } from "react";
 import type { Annotation, SelectionAnchor } from "@neoread/core";
-import { Trash2, StickyNote, SquarePen, Sparkles } from "lucide-react";
+import {
+  Trash2,
+  StickyNote,
+  SquarePen,
+  Sparkles,
+  Copy,
+  ListPlus,
+} from "lucide-react";
 import { Button } from "@neoread/ui/components/button";
 import {
   Tooltip,
@@ -28,6 +35,9 @@ export function AnnotationToolbar({
   onAskAI,
   onAnswer,
   onColor,
+  onCopyImage,
+  onInsertImage,
+  imageBusy,
 }: {
   annotation: Annotation;
   anchor: SelectionAnchor;
@@ -38,22 +48,39 @@ export function AnnotationToolbar({
   onAskAI: (annotation: Annotation) => void;
   onAnswer?: (annotation: Annotation) => void;
   onColor?: (annotation: Annotation, color: string) => void;
+  onCopyImage?: () => void;
+  onInsertImage?: () => void;
+  imageBusy?: boolean;
 }) {
   const hasNote = !!annotation.note.trim();
   const question = annotation.kind === "question";
   const actions = [
+    ...(onCopyImage && onInsertImage
+      ? [
+          { label: "复制区域截图", Icon: Copy, onClick: onCopyImage },
+          { label: "添加截图到笔记", Icon: ListPlus, onClick: onInsertImage },
+        ]
+      : []),
     {
       label: question ? "编辑问题" : hasNote ? "编辑批注" : "添加批注",
       Icon: hasNote ? SquarePen : StickyNote,
       onClick: () => onNote(annotation),
     },
-    question && onAnswer && !annotation.answerId
-      ? {
-          label: "让 AI 回答",
-          Icon: Sparkles,
-          onClick: () => onAnswer(annotation),
-        }
-      : { label: "问 AI", Icon: Sparkles, onClick: () => onAskAI(annotation) },
+    ...(!onCopyImage
+      ? [
+          question && onAnswer && !annotation.answerId
+            ? {
+                label: "让 AI 回答",
+                Icon: Sparkles,
+                onClick: () => onAnswer(annotation),
+              }
+            : {
+                label: "问 AI",
+                Icon: Sparkles,
+                onClick: () => onAskAI(annotation),
+              },
+        ]
+      : []),
     {
       label: `删除${annotationLabels[annotation.kind]}`,
       Icon: Trash2,
@@ -78,7 +105,7 @@ export function AnnotationToolbar({
                 size="icon-sm"
                 variant="ghost"
                 aria-label={label}
-                disabled={deleting}
+                disabled={deleting || imageBusy}
                 onClick={onClick}
               />
             }

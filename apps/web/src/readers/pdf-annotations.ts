@@ -166,7 +166,11 @@ export class PDFAnnotationLayer {
       .querySelectorAll(".neoread-highlight[data-hovered]")
       .forEach((el) => el.removeAttribute("data-hovered"));
   };
-  private find(event: MouseEvent) {
+  activateRegion(event: MouseEvent) {
+    const hit = this.find(event, true);
+    if (hit) this.activate(hit);
+  }
+  private find(event: MouseEvent, regionOnly = false) {
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest("a, button, input, textarea, [data-block-action]"))
       return;
@@ -182,6 +186,7 @@ export class PDFAnnotationLayer {
       if (
         annotation.kind === "bookmark" ||
         annotation.location.type !== "pdf" ||
+        (regionOnly && !annotation.location.region) ||
         annotation.location.page !== Number(page.dataset.pageNumber)
       )
         continue;
@@ -233,7 +238,7 @@ export class PDFAnnotationLayer {
       window.getSelection()?.toString().trim()
     )
       return;
-    const hit = this.find(event);
+    const hit = this.find(event, true) ?? this.find(event);
     if (!hit) return;
     event.preventDefault();
     event.stopPropagation();

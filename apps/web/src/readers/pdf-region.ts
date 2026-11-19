@@ -22,7 +22,10 @@ export class PDFRegionTool {
     start: { x: number; y: number };
     preview: HTMLDivElement;
   };
-  constructor(private host: HTMLElement) {
+  constructor(
+    private host: HTMLElement,
+    private onTap?: (event: PointerEvent) => void,
+  ) {
     host.addEventListener("pointerdown", this.down, true);
     host.addEventListener("pointermove", this.move, true);
     host.addEventListener("pointerup", this.up, true);
@@ -90,6 +93,10 @@ export class PDFRegionTool {
     const rect = regionRect(start, this.point(event, page));
     const size = page.getBoundingClientRect();
     this.cancel();
+    if (Math.hypot(rect.width * size.width, rect.height * size.height) <= 5) {
+      this.onTap?.(event);
+      return;
+    }
     if (rect.width * size.width < 6 || rect.height * size.height < 6) return;
     this.callback?.({
       text: "",

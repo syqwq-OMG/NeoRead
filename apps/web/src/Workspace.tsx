@@ -124,13 +124,17 @@ import {
 } from "./annotations";
 import { ColorSwatches } from "./ColorSwatches";
 import { useSelectionClipboard } from "./useSelectionClipboard";
-import { copyImage, copyText } from "./chat/clipboard";
+import { copyText } from "./chat/clipboard";
 import { NotesPanel } from "./NotesPanel";
 import { PaperNote } from "./PaperNote";
 import { PDFAnnotationTools, type AnnotationTool } from "./PDFAnnotationTools";
-import { RegionContextMenu } from "./RegionContextMenu";
 import { reportDiagnostic } from "./diagnostics";
-import { appendExcerpt, copyExcerpt, excerptMarkdown } from "./note-excerpts";
+import {
+  appendExcerpt,
+  copyExcerpt,
+  copyImageExcerpt,
+  excerptMarkdown,
+} from "./note-excerpts";
 import { ExportDocumentDialog } from "./ExportDocumentDialog";
 import { EPUBReadingView } from "./translation/EPUBReadingView";
 import { PDFReadingView } from "./translation/PDFReadingView";
@@ -300,6 +304,11 @@ export function Workspace({
     return () => controller.abort();
   }, [doc.id]);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const readerAnnotations = useMemo(
+    () => annotations.filter((item) => !item.sourceImageId),
+    [annotations],
+  );
+  const copyingImages = useRef(new Set<string>());
   const annotationSaving = useRef(false);
   const [noteSaving, setNoteSaving] = useState(false);
   const selectionClipboard = useSelectionClipboard(theme.autoCopySelection);
@@ -707,7 +716,7 @@ export function Workspace({
       });
       setAnnotations((items) => applySavedAnnotation(items, saved));
       await ensureRegionImage(saved);
-      toast.success("区域已保存，右键可复制截图或添加到笔记");
+      toast.success("区域已保存，点击区域可复制截图或添加到笔记");
     } catch (error) {
       if (regionAbort.current.signal.aborted) return;
       reportDiagnostic({
@@ -737,10 +746,15 @@ export function Workspace({
     if (regionBusy) return;
     setRegionBusy(true);
     try {
-      const image = await ensureRegionImage(annotation);
       const markdown = excerptMarkdown(annotation, true);
-      if (copyOnly) await copyExcerpt(markdown, image);
-      else {
+      if (copyOnly) {
+        await copyImageExcerpt(async () => ({
+          markdown,
+          image: await ensureRegionImage(annotation),
+        }));
+        toast.success("已复制截图和原文位置");
+      } else {
+        await ensureRegionImage(annotation);
         await appendExcerpt(doc.id, markdown);
         setRight(true);
         setRightTab("paper-note");
@@ -1147,11 +1161,54 @@ export function Workspace({
       if (serial === sendSerial.current) setSending(false);
     }
   };
+  const copySourceImage = async (
+    sourceImageId: string,
+    url: string,
+    location: DocumentLocation,
+    caption: string,
+  ) => {
+    if (copyingImages.current.has(sourceImageId)) return;
+    copyingImages.current.add(sourceImageId);
+    try {
+      await copyImageExcerpt(async () => {
+        const signal = regionAbort.current.signal;
+        const response = await fetch(url, { signal });
+        if (!response.ok) throw new Error("无法读取原文图片");
+        const image = await response.blob();
+        const saved =
+          annotations.find((item) => item.sourceImageId === sourceImageId) ??
+          (await api.annotate(doc.id, {
+            kind: "note",
+            sourceImageId,
+            location,
+            quote: caption,
+            note: "",
+            color: markColor,
+          }));
+        setAnnotations((items) => applySavedAnnotation(items, saved));
+        await api.saveNoteImage(doc.id, saved.id, image, signal);
+        return { markdown: excerptMarkdown(saved, true), image };
+      });
+      toast.success("已复制图片和原文位置");
+    } catch (error) {
+      if (regionAbort.current.signal.aborted) return;
+      reportDiagnostic({
+        level: "error",
+        event: "note.image.copy_failed",
+        detail: "reason=source_image_copy_failed",
+      });
+      toast.error((error as Error).message);
+    } finally {
+      copyingImages.current.delete(sourceImageId);
+    }
+  };
   const blockAction = (block: PDFBlock, action: PDFBlockAction) => {
     if (action === "copy") {
       if (block.image)
-        void copyImage(
+        void copySourceImage(
+          block.id,
           blockImageURL(doc.id, block.id, block.image),
+          { type: "pdf", page: block.page, rects: [block.bounds] },
           (block.caption || block.text).trim(),
         );
       else void copyText(block.text.trim(), "已复制");
@@ -1214,7 +1271,12 @@ export function Workspace({
   const epubBlockAction = (block: EPUBReadingBlock, action: PDFBlockAction) => {
     if (action === "copy") {
       if (block.image)
-        void copyImage(blockImageURL(doc.id, block.id), block.text.trim());
+        void copySourceImage(
+          block.id,
+          blockImageURL(doc.id, block.id),
+          block.location,
+          block.text.trim(),
+        );
       else void copyText(block.text.trim(), "已复制");
       return;
     }
@@ -1588,15 +1650,7 @@ export function Workspace({
           className={left ? "" : "sidebar-handle-closed"}
         />
         <ResizablePanel id="reading" minSize="30%">
-          <RegionContextMenu
-            pane={readingPane}
-            annotations={annotations}
-            active={active}
-            busy={regionBusy}
-            onCopy={(annotation) => void useRegion(annotation, true)}
-            onInsert={(annotation) => void useRegion(annotation, false)}
-            onDelete={(annotation) => void removeAnnotation(annotation.id)}
-          >
+          <div className="reading-pane" ref={readingPane}>
             {doc.type === "pdf" && active && (
               <PDFAnnotationTools
                 tool={annotationTool}
@@ -1623,7 +1677,7 @@ export function Workspace({
                   sidebarsOpen={{ left, right }}
                   document={doc}
                   theme={theme}
-                  annotations={annotations}
+                  annotations={readerAnnotations}
                   blocks={blocks}
                   processing={processing}
                   toolbarHost={readingToolbar}
@@ -1665,6 +1719,19 @@ export function Workspace({
                 anchor={annotationTarget.anchor}
                 pane={readingPane}
                 deleting={deleting.has(selectedAnnotation.id)}
+                onCopyImage={
+                  selectedAnnotation.location.type === "pdf" &&
+                  selectedAnnotation.location.region
+                    ? () => void useRegion(selectedAnnotation, true)
+                    : undefined
+                }
+                onInsertImage={
+                  selectedAnnotation.location.type === "pdf" &&
+                  selectedAnnotation.location.region
+                    ? () => void useRegion(selectedAnnotation, false)
+                    : undefined
+                }
+                imageBusy={regionBusy}
                 onDelete={(id) => void removeAnnotation(id)}
                 onNote={(annotation) =>
                   editAnnotationNote(annotation, annotationTarget.anchor)
@@ -1758,7 +1825,7 @@ export function Workspace({
                 </IconButton>
               </SelectionToolbar>
             )}
-          </RegionContextMenu>
+          </div>
         </ResizablePanel>
         <ResizableHandle
           disabled={!right}
