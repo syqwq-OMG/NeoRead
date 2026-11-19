@@ -7,6 +7,52 @@ import { Slice, DOMParser, DOMSerializer } from "@milkdown/kit/prose/model";
 import { createPaperNoteEditor } from "./paper-note-milkdown";
 
 const editors: Awaited<ReturnType<typeof createPaperNoteEditor>>[] = [];
+
+it("pastes stored region screenshots with a keyboard-accessible source backlink", async () => {
+  const documentId = "a".repeat(32),
+    annotationId = "b".repeat(32);
+  const markdown = `![区域截图](neoread-note-image://${documentId}/${annotationId})\n\n[第 2 页 · 原文](neoread://open?id=${documentId}&annotation=${annotationId})`;
+  const open = vi.fn(() => true);
+  const { view, editor, change } = await create("", vi.fn(), {
+    onOpenReference: open,
+  });
+  const event = {
+    clipboardData: {
+      getData: (type: string) => (type === "text/plain" ? markdown : ""),
+    },
+  } as ClipboardEvent;
+  expect(
+    view.someProp("handlePaste", (handler) =>
+      handler(view, event, Slice.empty),
+    ),
+  ).toBe(true);
+  const image = view.dom.querySelector("img[src]")!;
+  expect(image, view.dom.innerHTML).not.toBeNull();
+  expect(image.getAttribute("src")).toContain(
+    `/note-assets/${annotationId}.png`,
+  );
+  const saved = editor.ctx.get(serializerCtx)(view.state.doc);
+  expect(saved).toContain(`neoread-note-image://${documentId}/${annotationId}`);
+  expect(saved).not.toContain("/pub/");
+  const clipboard = document.createElement("div");
+  clipboard.append(
+    DOMSerializer.fromSchema(view.state.schema).serializeFragment(
+      view.state.doc.content,
+    ),
+  );
+  expect(
+    DOMParser.fromSchema(view.state.schema).parse(clipboard).toJSON(),
+  ).toEqual(view.state.doc.toJSON());
+  const link = view.dom.querySelector<HTMLElement>("[data-note-link]")!;
+  expect(link.tabIndex).toBe(0);
+  change.mockClear();
+  link.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  link.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+  );
+  expect(open).toHaveBeenCalledTimes(2);
+  expect(change).not.toHaveBeenCalled();
+});
 const create = async (
   body: string,
   change = vi.fn(),

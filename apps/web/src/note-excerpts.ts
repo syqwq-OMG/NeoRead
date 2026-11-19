@@ -28,6 +28,13 @@ export async function appendExcerpt(documentId: string, markdown: string) {
   await note.flush();
 }
 export async function copyExcerpt(markdown: string, image?: Blob) {
+  if (image && window.neoreadDesktop?.writeClipboardImage) {
+    await window.neoreadDesktop.writeClipboardImage(
+      new Uint8Array(await image.arrayBuffer()),
+      markdown,
+    );
+    return;
+  }
   if (
     image &&
     navigator.clipboard?.write &&

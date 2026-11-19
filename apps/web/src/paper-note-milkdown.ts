@@ -18,6 +18,8 @@ import { gfm, extendListItemSchemaForTask } from "@milkdown/kit/preset/gfm";
 import { history } from "@milkdown/kit/plugin/history";
 import { EditorState, Selection } from "@milkdown/kit/prose/state";
 import { parseNeoReadLink } from "@neoread/core";
+import { noteImageURL } from "@neoread/api";
+import { parseNoteImage } from "./note-excerpts";
 import type { EditorView } from "@milkdown/kit/prose/view";
 import { $node, $remark } from "@milkdown/kit/utils";
 import { Slice } from "@milkdown/kit/prose/model";
@@ -66,7 +68,7 @@ const inertImage = imageSchema.extendSchema((previous) => (ctx) => ({
   ...previous(ctx),
   parseDOM: [
     {
-      tag: "span[data-note-image]",
+      tag: "[data-note-image]",
       getAttrs: (dom) => {
         const element = dom as HTMLElement;
         return {
@@ -78,16 +80,31 @@ const inertImage = imageSchema.extendSchema((previous) => (ctx) => ({
     },
     ...(previous(ctx).parseDOM ?? []),
   ],
-  toDOM: (node) => [
-    "span",
-    {
-      "data-note-image": node.attrs.src,
-      "data-alt": node.attrs.alt,
-      title: node.attrs.title,
-      class: "text-muted-foreground",
-    },
-    `[图片：${node.attrs.alt || "未加载"}]`,
-  ],
+  toDOM: (node) =>
+    parseNoteImage(node.attrs.src)
+      ? [
+          "img",
+          {
+            "data-note-image": node.attrs.src,
+            "data-alt": node.attrs.alt,
+            src: noteImageURL(
+              parseNoteImage(node.attrs.src)!.documentId,
+              parseNoteImage(node.attrs.src)!.annotationId,
+            ),
+            alt: node.attrs.alt || "区域截图",
+            draggable: "false",
+          },
+        ]
+      : [
+          "span",
+          {
+            "data-note-image": node.attrs.src,
+            "data-alt": node.attrs.alt,
+            title: node.attrs.title,
+            class: "text-muted-foreground",
+          },
+          `[图片：${node.attrs.alt || "未加载"}]`,
+        ],
 }));
 const taskCheckbox = extendListItemSchemaForTask.extendSchema(
   (previous) => (ctx) => ({

@@ -65,6 +65,7 @@ import {
 } from "@neoread/ui/components/tabs";
 import { CitePluginSettings } from "./cite/CitePluginSettings";
 import { HighlightColorsEditor } from "./HighlightColorsEditor";
+import { AnnotationToolbarSettings } from "./PDFAnnotationTools";
 import { ProxySettings } from "./ProxySettings";
 import {
   libraryMode,
@@ -1018,6 +1019,7 @@ export function Settings({
             <section>
               <HighlightColorsEditor />
             </section>
+            <AnnotationToolbarSettings />
           </TabsContent>
           <TabsContent value="papers" className="settings-panel" keepMounted>
             {window.neoreadDesktop?.libraryLocation && (

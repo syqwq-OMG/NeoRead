@@ -20,6 +20,8 @@ export type SentenceLink = {
   }[];
 };
 export type PDFLocation = {
+  /** A rectangular region snapshot, independent of text selection. */
+  region?: boolean;
   /** Independent source marks split from legacy translation-origin records. */
   sourceAnchors?: {
     blockId: string;
@@ -442,6 +444,8 @@ export interface ReaderTheme {
   assistantFontFamily?: string;
   /** Chat code block font; unset uses the system monospace stack. */
   assistantCodeFontFamily?: string;
+  annotationToolbarMode?: "docked" | "ball";
+  annotationToolbarDock?: "top" | "bottom" | "left" | "right";
   assistantFontWeight?: "normal" | "bold";
   /** "sans-serif", "serif" or an installed font family name. */
   translationFontFamily?: string;
@@ -553,6 +557,15 @@ export interface ReaderEvents {
   selection: (selection: ReaderSelection | null) => void;
 }
 export interface ReaderAdapter {
+  setRegionSelection?(
+    enabled: boolean,
+    onSelect?: (selection: ReaderSelection) => void,
+  ): void;
+  renderRegionImage?(
+    location: PDFLocation,
+    signal: AbortSignal,
+    width?: number,
+  ): Promise<Blob>;
   open(document: Document): Promise<void>;
   getTOC(): Promise<TOCItem[]>;
   getPageCount?(): number;

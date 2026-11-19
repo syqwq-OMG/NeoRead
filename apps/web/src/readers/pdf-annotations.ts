@@ -75,6 +75,11 @@ export class PDFAnnotationLayer {
             el.dataset.annotationId = annotation.id;
           if (el.dataset.kind !== annotation.kind)
             el.dataset.kind = annotation.kind;
+          el.toggleAttribute(
+            "data-region",
+            annotation.location.type === "pdf" &&
+              annotation.location.region === true,
+          );
           const geometry = {
             left: rect.x,
             top: rect.y,

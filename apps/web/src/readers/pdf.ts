@@ -80,7 +80,9 @@ function textLayerRects(range: Range, page: Element) {
   });
 }
 
+import { PDFRegionTool } from "./pdf-region";
 export class PDFReaderAdapter implements ReaderAdapter {
+  private regionTool: PDFRegionTool;
   private pdf?: pdfjs.PDFDocumentProxy;
   private task?: pdfjs.PDFDocumentLoadingTask;
   private viewer: PDFViewer;
@@ -116,6 +118,7 @@ export class PDFReaderAdapter implements ReaderAdapter {
     private events: ReaderEvents,
   ) {
     container.classList.add("pdf-container");
+    this.regionTool = new PDFRegionTool(container);
     this.removeExternalLinks = installPDFExternalLinks(container);
     this.figureLinks = new PDFFigureLinks(
       container,
@@ -739,10 +742,45 @@ export class PDFReaderAdapter implements ReaderAdapter {
     const block = this.blockData.find((item) => item.id === blockId);
     if (!block || !this.pdf || this.disposed) throw new Error("图片位置不可用");
     signal.throwIfAborted();
-    const page = await this.pdf.getPage(block.page);
+    return this.renderRegionImage(
+      { type: "pdf", page: block.page, rects: [block.bounds] },
+      signal,
+      width,
+      theme,
+    );
+  }
+  setRegionSelection(
+    enabled: boolean,
+    onSelect?: (selection: ReaderSelection) => void,
+  ) {
+    if (enabled) this.clearSelection();
+    this.regionTool.set(enabled, onSelect);
+  }
+  async renderRegionImage(
+    location: PDFLocation,
+    signal: AbortSignal,
+    width?: number,
+    theme: ReaderTheme = defaultTheme,
+  ): Promise<Blob> {
+    signal.throwIfAborted();
+    const bounds = location.rects?.[0];
+    if (
+      !this.pdf ||
+      !bounds ||
+      ![bounds.x, bounds.y, bounds.width, bounds.height].every(
+        Number.isFinite,
+      ) ||
+      bounds.width <= 0 ||
+      bounds.height <= 0 ||
+      bounds.x < 0 ||
+      bounds.y < 0 ||
+      bounds.x + bounds.width > 1.001 ||
+      bounds.y + bounds.height > 1.001
+    )
+      throw new Error("区域范围无效");
+    const page = await this.pdf.getPage(location.page);
     signal.throwIfAborted();
     const base = page.getViewport({ scale: 1 });
-    const bounds = block.bounds;
     const area = base.width * bounds.width * base.height * bounds.height;
     const scale = Math.min(
       6,
@@ -788,6 +826,7 @@ export class PDFReaderAdapter implements ReaderAdapter {
     }
   }
   async destroy() {
+    this.regionTool.destroy();
     if (this.disposed) return;
     this.navigation.destroy();
     this.blocks.destroy();

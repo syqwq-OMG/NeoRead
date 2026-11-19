@@ -49,7 +49,7 @@ import {
   Moon,
   CircleHelp,
 } from "lucide-react";
-import { api, blockImageURL } from "@neoread/api";
+import { api, blockImageURL, noteImageURL } from "@neoread/api";
 import {
   locationLabel,
   type DocumentChatSession,
@@ -127,12 +127,15 @@ import { useSelectionClipboard } from "./useSelectionClipboard";
 import { copyImage, copyText } from "./chat/clipboard";
 import { NotesPanel } from "./NotesPanel";
 import { PaperNote } from "./PaperNote";
+import { PDFAnnotationTools, type AnnotationTool } from "./PDFAnnotationTools";
+import { RegionContextMenu } from "./RegionContextMenu";
+import { reportDiagnostic } from "./diagnostics";
 import { appendExcerpt, copyExcerpt, excerptMarkdown } from "./note-excerpts";
 import { ExportDocumentDialog } from "./ExportDocumentDialog";
 import { EPUBReadingView } from "./translation/EPUBReadingView";
 import { PDFReadingView } from "./translation/PDFReadingView";
 import type { ReadingMode } from "./translation/reading-mode";
-import { useReaderStore } from "./store";
+import { useReaderStore, openLinkTarget } from "./store";
 import { scheduleProgress, flushProgress } from "./progress";
 import { pdfModeLocation, savePDFProgress } from "./pdf-progress";
 import { ReadingTextControls } from "./ReadingTextControls";
@@ -287,6 +290,15 @@ export function Workspace({
   const [translationSelection, setTranslationSelection] =
     useState<ReaderSelection | null>(null);
   const [selection, setSelection] = useState<ReaderSelection | null>(null);
+  const [annotationTool, setAnnotationTool] =
+    useState<AnnotationTool>("select");
+  const [regionBusy, setRegionBusy] = useState(false);
+  const regionAbort = useRef(new AbortController());
+  useEffect(() => {
+    const controller = new AbortController();
+    regionAbort.current = controller;
+    return () => controller.abort();
+  }, [doc.id]);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const annotationSaving = useRef(false);
   const [noteSaving, setNoteSaving] = useState(false);
@@ -636,21 +648,141 @@ export function Workspace({
       (e) => toast.error(e.message),
     );
   };
+  const ensureRegionImage = async (annotation: Annotation) => {
+    const response = await fetch(noteImageURL(doc.id, annotation.id), {
+      signal: regionAbort.current.signal,
+    });
+    if (response.ok) return response.blob();
+    if (response.status !== 404) throw new Error("无法读取区域截图");
+    if (annotation.location.type !== "pdf" || !adapter?.renderRegionImage)
+      throw new Error("当前视图不支持区域截图");
+    let image: Blob;
+    try {
+      image = await adapter.renderRegionImage(
+        annotation.location,
+        regionAbort.current.signal,
+        1400,
+      );
+    } catch (error) {
+      reportDiagnostic({
+        level: regionAbort.current.signal.aborted ? "info" : "error",
+        event: regionAbort.current.signal.aborted
+          ? "note.region.capture_cancelled"
+          : "note.region.capture_failed",
+        detail: regionAbort.current.signal.aborted
+          ? "reason=reader_closed"
+          : "reason=pdf_render_failed",
+      });
+      throw error;
+    }
+    try {
+      await api.saveNoteImage(
+        doc.id,
+        annotation.id,
+        image,
+        regionAbort.current.signal,
+      );
+    } catch (error) {
+      if (regionAbort.current.signal.aborted) throw error;
+      reportDiagnostic({
+        level: "error",
+        event: "note.region.capture_failed",
+        detail: "reason=image_upload_failed",
+      });
+      throw error;
+    }
+    return image;
+  };
+  const createRegion = async (value: ReaderSelection) => {
+    if (annotationSaving.current || value.location.type !== "pdf") return;
+    annotationSaving.current = true;
+    setRegionBusy(true);
+    try {
+      const saved = await api.annotate(doc.id, {
+        kind: "note",
+        quote: "",
+        note: "",
+        color: markColor,
+        location: value.location,
+      });
+      setAnnotations((items) => applySavedAnnotation(items, saved));
+      await ensureRegionImage(saved);
+      toast.success("区域已保存，右键可复制截图或添加到笔记");
+    } catch (error) {
+      if (regionAbort.current.signal.aborted) return;
+      reportDiagnostic({
+        level: "error",
+        event: "note.region.capture_failed",
+        detail: "reason=render_or_save_failed",
+      });
+      toast.error((error as Error).message);
+    } finally {
+      annotationSaving.current = false;
+      setRegionBusy(false);
+    }
+  };
+  const regionHandler = useRef(createRegion);
+  regionHandler.current = createRegion;
+  const regionAvailable =
+    doc.type === "pdf" &&
+    (readingMode === "source" || readingMode === "parallel");
+  useEffect(() => {
+    adapter?.setRegionSelection?.(
+      active && !regionBusy && annotationTool === "region" && regionAvailable,
+      (value) => void regionHandler.current(value),
+    );
+    return () => adapter?.setRegionSelection?.(false);
+  }, [adapter, active, regionBusy, annotationTool, regionAvailable]);
+  const useRegion = async (annotation: Annotation, copyOnly: boolean) => {
+    if (regionBusy) return;
+    setRegionBusy(true);
+    try {
+      const image = await ensureRegionImage(annotation);
+      const markdown = excerptMarkdown(annotation, true);
+      if (copyOnly) await copyExcerpt(markdown, image);
+      else {
+        await appendExcerpt(doc.id, markdown);
+        setRight(true);
+        setRightTab("paper-note");
+      }
+    } catch (error) {
+      if (regionAbort.current.signal.aborted) return;
+      reportDiagnostic({
+        level: "error",
+        event: "note.region.excerpt_failed",
+        detail: "reason=copy_or_save_failed",
+      });
+      toast.error((error as Error).message);
+    } finally {
+      setRegionBusy(false);
+    }
+  };
   const excerptSelection = async (copyOnly: boolean) => {
     if (!selection || annotationSaving.current) return;
     annotationSaving.current = true;
     try {
       const prepared =
         (await adapter?.prepareAnnotation?.(selection)) ?? selection;
-      const saved = await api.annotate(doc.id, {
-        kind: "note",
-        location: prepared.location,
-        quote: prepared.text,
-        note: "",
-        color: markColor,
-      });
-      setAnnotations((items) => applySavedAnnotation(items, saved));
-      const markdown = excerptMarkdown(saved);
+      const saved: Annotation[] = [];
+      await saveAnnotationParts(
+        prepared,
+        (part) =>
+          api.annotate(doc.id, {
+            kind: "note",
+            location: part.location,
+            quote: part.text,
+            note: "",
+            color: markColor,
+          }),
+        (annotation) => {
+          saved.push(annotation);
+          setAnnotations((items) => applySavedAnnotation(items, annotation));
+        },
+        setSelection,
+      );
+      const markdown = saved
+        .map((annotation) => excerptMarkdown(annotation))
+        .join("\n\n");
       if (copyOnly) await copyExcerpt(markdown);
       else {
         await appendExcerpt(doc.id, markdown);
@@ -735,6 +867,15 @@ export function Workspace({
       setNoteSaving(false);
     }
   };
+  useEffect(() => {
+    if (
+      active &&
+      doc.type === "pdf" &&
+      selection?.text &&
+      (annotationTool === "highlight" || annotationTool === "underline")
+    )
+      void annotate(annotationTool);
+  }, [selection, annotationTool, active]);
   useAnnotationUndo(
     doc.id,
     (items) => {
@@ -1447,7 +1588,30 @@ export function Workspace({
           className={left ? "" : "sidebar-handle-closed"}
         />
         <ResizablePanel id="reading" minSize="30%">
-          <div className="reading-pane" ref={readingPane}>
+          <RegionContextMenu
+            pane={readingPane}
+            annotations={annotations}
+            active={active}
+            busy={regionBusy}
+            onCopy={(annotation) => void useRegion(annotation, true)}
+            onInsert={(annotation) => void useRegion(annotation, false)}
+            onDelete={(annotation) => void removeAnnotation(annotation.id)}
+          >
+            {doc.type === "pdf" && active && (
+              <PDFAnnotationTools
+                tool={annotationTool}
+                color={markColor}
+                disabled={!adapter || regionBusy}
+                onColor={chooseColor}
+                onTool={(tool) => {
+                  if (tool === "region" && !regionAvailable) {
+                    toast.info("请切换到原文或对照模式使用矩形框选");
+                    return;
+                  }
+                  setAnnotationTool(tool);
+                }}
+              />
+            )}
             {(() => {
               const ReadingView =
                 doc.type === "pdf" ? PDFReadingView : EPUBReadingView;
@@ -1525,19 +1689,23 @@ export function Workspace({
                 >
                   <StickyNote />
                 </IconButton>
-                <ColorSwatches
-                  action="高亮"
-                  onPick={(color) => {
-                    chooseColor(color);
-                    void annotate("highlight", "", color);
-                  }}
-                />
-                <IconButton
-                  label="下划线"
-                  onClick={() => void annotate("underline")}
-                >
-                  <Underline />
-                </IconButton>
+                {doc.type !== "pdf" && (
+                  <ColorSwatches
+                    action="高亮"
+                    onPick={(color) => {
+                      chooseColor(color);
+                      void annotate("highlight", "", color);
+                    }}
+                  />
+                )}
+                {doc.type !== "pdf" && (
+                  <IconButton
+                    label="下划线"
+                    onClick={() => void annotate("underline")}
+                  >
+                    <Underline />
+                  </IconButton>
+                )}
                 <IconButton
                   label="添加批注"
                   onClick={() => {
@@ -1590,7 +1758,7 @@ export function Workspace({
                 </IconButton>
               </SelectionToolbar>
             )}
-          </div>
+          </RegionContextMenu>
         </ResizablePanel>
         <ResizableHandle
           disabled={!right}
@@ -1871,8 +2039,17 @@ export function Workspace({
                   annotations={annotations}
                   onOpenReference={(url) => {
                     const target = parseNeoReadLink(url);
-                    if (!target || target.id !== doc.id || !target.annotation)
-                      return false;
+                    if (!target || !target.annotation) return false;
+                    if (target.id !== doc.id) {
+                      void openLinkTarget(target)
+                        .then((opened) => {
+                          if (!opened) toast.info("原文不在当前书库中");
+                        })
+                        .catch((error) =>
+                          toast.error((error as Error).message),
+                        );
+                      return true;
+                    }
                     const annotation = annotations.find(
                       (item) => item.id === target.annotation,
                     );

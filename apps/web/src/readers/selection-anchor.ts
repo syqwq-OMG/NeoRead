@@ -43,5 +43,10 @@ export function selectionAnchor(
   };
 }
 export function isSelectionToolbar(target: EventTarget | null) {
-  return target instanceof Element && !!target.closest(".selection-bar");
+  return (
+    target instanceof Element &&
+    !!target.closest(
+      ".selection-bar, .pdf-annotation-tools, [aria-label='PDF 批注工具']",
+    )
+  );
 }

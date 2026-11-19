@@ -1,4 +1,5 @@
 import { AnnotationQuote } from "./AnnotationQuote";
+import { noteImageURL } from "@neoread/api";
 import { useEffect, useRef, useState } from "react";
 import { registerTabCloseGuard } from "./document-tab-guards";
 import {
@@ -184,6 +185,13 @@ function NoteCard({
           quote={a.quote || locationLabel(a.location)}
           location={a.location}
         />
+        {a.location.type === "pdf" && a.location.region && (
+          <img
+            src={noteImageURL(a.documentId, a.id)}
+            alt="区域截图"
+            className="mt-2 max-h-48 max-w-full rounded border object-contain"
+          />
+        )}
       </Button>
       {a.location.type === "epub" && a.location.unresolved && (
         <p className="note-card-status">定位异常</p>
