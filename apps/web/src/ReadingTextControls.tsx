@@ -415,7 +415,12 @@ function FontRow({
               </span>
             </SelectValue>
           </SelectTrigger>
-          <SelectContent className="max-h-72">
+          <SelectContent
+            className="max-h-72"
+            alignItemWithTrigger={false}
+            side="bottom"
+            align="start"
+          >
             {monospace && (
               <SelectItem
                 value="monospace"
