@@ -4,6 +4,91 @@
  */
 
 export interface paths {
+    "/api/documents/{id}/annotations/{annotation}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                annotation: string;
+            };
+            cookie?: never;
+        };
+        /** Read a paper-owned note screenshot */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    annotation: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description PNG screenshot */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/png": string;
+                    };
+                };
+                /** @description Not found or unauthorized */
+                default: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /** Save an immutable PNG snapshot for a PDF region annotation */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    annotation: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "image/png": string;
+                };
+            };
+            responses: {
+                /** @description Saved */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            saved: boolean;
+                        };
+                    };
+                };
+                /** @description Invalid image, missing region, or persistence failure */
+                default: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/{id}/navigation": {
         parameters: {
             query?: never;
@@ -5319,6 +5404,8 @@ export interface components {
                 text: string;
                 start: number;
             };
+            /** @description A PDF region annotation with one normalized rectangle. */
+            region?: boolean;
             rects?: {
                 x: number;
                 y: number;

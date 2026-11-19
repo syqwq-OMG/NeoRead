@@ -207,6 +207,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/documents/{id}/annotations/recover", s.recoverAnnotations)
 	mux.HandleFunc("POST /api/annotations/migrate-legacy", s.migrateLegacyAnnotations)
 	mux.HandleFunc("POST /api/documents/{id}/annotations", s.recordAnnotation(s.saveAnnotation))
+	mux.HandleFunc("PUT /api/documents/{id}/annotations/{annotation}/image", s.saveNoteImage)
+	mux.HandleFunc("GET /api/documents/{id}/annotations/{annotation}/image", func(w http.ResponseWriter, r *http.Request) {
+		s.serveNoteImage(w, r, r.PathValue("id"), r.PathValue("annotation"))
+	})
 	mux.HandleFunc("PATCH /api/documents/{id}/annotations/{annotation}", s.recordAnnotation(s.updateAnnotationNote))
 	mux.HandleFunc("DELETE /api/documents/{id}/annotations/{annotation}", s.recordAnnotation(func(w http.ResponseWriter, r *http.Request) {
 		_, err := s.Store.DB.Exec("DELETE FROM annotations WHERE id=? AND document_id=?", r.PathValue("annotation"), r.PathValue("id"))
@@ -615,16 +619,27 @@ func (s *Server) importFileToCategory(ctx context.Context, temp, filename, libra
 }
 func validLocation(data json.RawMessage, kind string) bool {
 	var l struct {
-		Type        string  `json:"type"`
-		Page        int     `json:"page"`
-		Href        string  `json:"href"`
-		Locator     string  `json:"locator"`
-		Progression float64 `json:"progression"`
+		Type        string           `json:"type"`
+		Page        int              `json:"page"`
+		Href        string           `json:"href"`
+		Locator     string           `json:"locator"`
+		Progression float64          `json:"progression"`
+		Region      bool             `json:"region"`
+		Rects       []annotationRect `json:"rects"`
 	}
 	if json.Unmarshal(data, &l) != nil || l.Type != kind {
 		return false
 	}
 	if kind == "pdf" {
+		if l.Region {
+			if len(l.Rects) != 1 {
+				return false
+			}
+			r := l.Rects[0]
+			if r.X < 0 || r.Y < 0 || r.Width <= 0 || r.Height <= 0 || r.X+r.Width > 1.001 || r.Y+r.Height > 1.001 {
+				return false
+			}
+		}
 		return l.Page > 0
 	}
 	_, err := safeResource(l.Href)
@@ -850,6 +865,10 @@ func (s *Server) resource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := r.PathValue("resource")
+	if strings.HasPrefix(name, "note-assets/") && strings.HasSuffix(name, ".png") {
+		s.serveNoteImage(w, r, d.ID, strings.TrimSuffix(strings.TrimPrefix(name, "note-assets/"), ".png"))
+		return
+	}
 	if name == coverResource {
 		s.documentCover(w, r, d)
 		return

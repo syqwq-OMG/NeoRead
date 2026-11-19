@@ -70,6 +70,8 @@ export function paperAttachmentSource(
 export function publicationURL(documentId: string, resource: string) {
   return `/pub/${encodeURIComponent(sessionToken)}/${encodeURIComponent(documentId)}/${resource}`;
 }
+export const noteImageURL = (documentId: string, annotationId: string) =>
+  publicationURL(documentId, `note-assets/${annotationId}.png`);
 /** The book's own cover, or the stored first page of a PDF. */
 export function coverURL(documentId: string, revision?: number) {
   return publicationURL(
@@ -196,6 +198,15 @@ export type ChapterTranslationStatus =
   paths["/api/documents/{id}/translations/chapter-status"]["post"]["responses"]["200"]["content"]["application/json"];
 
 export const api = {
+  saveNoteImage: (documentId: string, annotationId: string, image: Blob) =>
+    request<{ saved: boolean }>(
+      `/api/documents/${documentId}/annotations/${annotationId}/image`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "image/png" },
+        body: image,
+      },
+    ),
   paperRefreshStatus: () =>
     request<PaperRefreshProgress>("/api/diagnostics/paper-refresh"),
   startPaperRefresh: () =>

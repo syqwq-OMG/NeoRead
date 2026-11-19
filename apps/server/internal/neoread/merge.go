@@ -151,6 +151,13 @@ func (s *Server) mergeDocuments(w http.ResponseWriter, r *http.Request) {
 			masterNote = body
 		}
 		if utf8.RuneCountInString(body) > utf8.RuneCountInString(note) {
+			if i > 0 {
+				body, err = s.copyNoteImages(body, d.ID, master.ID)
+				if err != nil {
+					fail(w, 500, "笔记截图复制失败，文档已保留")
+					return
+				}
+			}
 			note = body
 		}
 	}

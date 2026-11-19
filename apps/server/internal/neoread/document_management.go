@@ -139,7 +139,7 @@ func (s *Server) purgeDocument(ctx context.Context, id string) (int, string) {
 	for _, a := range attachments {
 		s.Store.cleanupAttachmentFile(a.Hash)
 	}
-	for _, path := range []string{s.Store.File(d), filepath.Join(s.Store.Root, "cache", id)} {
+	for _, path := range []string{s.Store.File(d), filepath.Join(s.Store.Root, "cache", id), filepath.Join(s.Store.Root, "note-assets", id)} {
 		if err = os.RemoveAll(path); err != nil {
 			log.Printf("document %s deleted; cleanup failed: %v", id, err)
 		}
