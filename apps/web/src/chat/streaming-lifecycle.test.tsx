@@ -150,3 +150,67 @@ it("scroll pauses on upward intent, ignores resizes until resumed and cleans obs
   expect(disconnected).toBe(1);
   expect(frames.size).toBe(0);
 });
+
+it("restores a paused chat position after its tab is hidden", () => {
+  let resize = () => {};
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      constructor(callback: () => void) {
+        resize = callback;
+      }
+      observe() {}
+      disconnect() {}
+    },
+  );
+  const frames = new Map<number, FrameRequestCallback>();
+  let id = 0;
+  vi.stubGlobal("requestAnimationFrame", (fn: FrameRequestCallback) => {
+    frames.set(++id, fn);
+    return id;
+  });
+  vi.stubGlobal("cancelAnimationFrame", (key: number) => frames.delete(key));
+  function Probe({
+    active,
+    identity = "request",
+  }: {
+    active: boolean;
+    identity?: string;
+  }) {
+    const scroll = useChatScroll(identity, active);
+    return (
+      <div ref={scroll.viewportRef}>
+        <div ref={scroll.contentRef}>answer</div>
+      </div>
+    );
+  }
+  act(() => root.render(<Probe active />));
+  const viewport = host.firstElementChild as HTMLDivElement;
+  Object.defineProperties(viewport, {
+    scrollHeight: { value: 1000, configurable: true },
+    clientHeight: { value: 100, configurable: true },
+  });
+  const flush = () =>
+    act(() => {
+      const pending = [...frames.values()];
+      frames.clear();
+      pending.forEach((fn) => fn(0));
+    });
+  flush();
+  act(() => {
+    viewport.dispatchEvent(new WheelEvent("wheel", { deltaY: -1 }));
+    viewport.scrollTop = 400;
+    viewport.dispatchEvent(new Event("scroll"));
+  });
+  act(() => root.render(<Probe active={false} />));
+  viewport.scrollTop = 0; // Hidden panels may have no layout or scroll range.
+  act(() => resize());
+  flush();
+  act(() => root.render(<Probe active />));
+  flush();
+  expect(viewport.scrollTop).toBe(400);
+  act(() => root.render(<Probe active={false} identity="next-request" />));
+  act(() => root.render(<Probe active identity="next-request" />));
+  flush();
+  expect(viewport.scrollTop).toBe(900);
+});

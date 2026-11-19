@@ -1592,6 +1592,7 @@ export function Workspace({
               </TabsList>
               <TabsContent
                 value="ai"
+                keepMounted
                 className="ai-panel"
                 style={
                   {
@@ -1641,6 +1642,7 @@ export function Workspace({
                 <AssistantPanel
                   key={currentSession?.id ?? doc.id}
                   session={session}
+                  active={active && right && rightTab === "ai"}
                   onRegenerate={() => void regenerate()}
                   regenerateDisabled={aiModelSaving || sending}
                   renderAnswer={(message, content) => (

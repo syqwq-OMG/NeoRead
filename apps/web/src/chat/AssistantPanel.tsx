@@ -66,6 +66,7 @@ export function chatRows(state: ChatSnapshot): ChatRow[] {
 }
 export function AssistantPanel({
   session,
+  active = true,
   empty,
   extras,
   references,
@@ -74,6 +75,7 @@ export function AssistantPanel({
   renderAnswer = (_message, content) => content,
 }: {
   session: ChatSession;
+  active?: boolean;
   empty: ReactNode;
   extras: (message: Message) => ReactNode;
   references: (message: Message) => ReactNode;
@@ -82,7 +84,7 @@ export function AssistantPanel({
   renderAnswer?: (message: Message, content: ReactNode) => ReactNode;
 }) {
   const state = useSyncExternalStore(session.subscribe, session.getSnapshot);
-  const scroll = useChatScroll(state.pending?.key);
+  const scroll = useChatScroll(state.pending?.key, active);
   const pending = state.pending;
   const retryAction = chatRetryAction(state);
   const regenerable = retryAction === "regenerate";
