@@ -1756,23 +1756,19 @@ export function Workspace({
                 >
                   <StickyNote />
                 </IconButton>
-                {doc.type !== "pdf" && (
-                  <ColorSwatches
-                    action="高亮"
-                    onPick={(color) => {
-                      chooseColor(color);
-                      void annotate("highlight", "", color);
-                    }}
-                  />
-                )}
-                {doc.type !== "pdf" && (
-                  <IconButton
-                    label="下划线"
-                    onClick={() => void annotate("underline")}
-                  >
-                    <Underline />
-                  </IconButton>
-                )}
+                <ColorSwatches
+                  action="高亮"
+                  onPick={(color) => {
+                    chooseColor(color);
+                    void annotate("highlight", "", color);
+                  }}
+                />
+                <IconButton
+                  label="下划线"
+                  onClick={() => void annotate("underline")}
+                >
+                  <Underline />
+                </IconButton>
                 <IconButton
                   label="添加批注"
                   onClick={() => {
