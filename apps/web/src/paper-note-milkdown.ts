@@ -22,7 +22,7 @@ import { noteImageURL } from "@neoread/api";
 import { parseNoteImage } from "./note-excerpts";
 import type { EditorView } from "@milkdown/kit/prose/view";
 import { $node, $remark } from "@milkdown/kit/utils";
-import { Slice } from "@milkdown/kit/prose/model";
+import { Slice, type Node as ProseNode } from "@milkdown/kit/prose/model";
 import { visit } from "unist-util-visit";
 import {
   paperNoteMath,
@@ -168,6 +168,84 @@ function assertSupported(tree: Root | RootContent) {
   if ("children" in tree) tree.children.forEach(assertSupported);
 }
 
+/** Delete screenshot excerpts as a unit, including the older two-paragraph form. */
+function deleteImageExcerpt(view: EditorView, event: KeyboardEvent) {
+  if (
+    event.isComposing ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    (event.key !== "Backspace" && event.key !== "Delete")
+  )
+    return false;
+  const { doc, selection } = view.state;
+  const { from, to } = selection;
+  let start: number | undefined;
+  let end: number | undefined;
+  doc.descendants((block, pos) => {
+    if (!block.isTextblock) return;
+    block.forEach((image, offset, index) => {
+      if (image.type.name !== "image") return;
+      const source = parseNoteImage(image.attrs.src);
+      if (!source) return;
+      let linkBlock = block;
+      let linkIndex = index + 1;
+      let linkPos = pos + 1 + offset + image.nodeSize;
+      const separator = block.maybeChild(linkIndex);
+      if (
+        separator &&
+        (separator.type.name === "hardbreak" ||
+          (separator.isText &&
+            !separator.text?.trim() &&
+            !separator.marks.length))
+      ) {
+        linkIndex++;
+        linkPos += separator.nodeSize;
+      }
+      if (!block.maybeChild(linkIndex) && index === 0) {
+        const after = pos + block.nodeSize;
+        const next = doc.resolve(after).nodeAfter;
+        if (!next?.isTextblock) return;
+        linkBlock = next;
+        linkIndex = 0;
+        linkPos = after + 1;
+      }
+      const matchesSource = (node: ProseNode | null) =>
+        node?.isText &&
+        node.marks.some((mark) => {
+          if (mark.type.name !== "link") return false;
+          const target = parseNeoReadLink(mark.attrs.href);
+          return (
+            target?.id === source.documentId &&
+            target.annotation === source.annotationId
+          );
+        });
+      let linkEnd = linkPos;
+      while (
+        linkIndex < linkBlock.childCount &&
+        matchesSource(linkBlock.child(linkIndex))
+      ) {
+        linkEnd += linkBlock.child(linkIndex++).nodeSize;
+      }
+      if (linkEnd === linkPos) return;
+      const imageStart = pos + 1 + offset;
+      const touches = !selection.empty
+        ? from < linkEnd && to > imageStart
+        : event.key === "Backspace"
+          ? from > imageStart && from <= linkEnd
+          : from >= imageStart && from < linkEnd;
+      if (!touches) return;
+      start = Math.min(start ?? from, imageStart);
+      end = Math.max(end ?? to, linkEnd);
+    });
+    return false;
+  });
+  if (start === undefined || end === undefined) return false;
+  event.preventDefault();
+  view.dispatch(view.state.tr.deleteRange(start, end).scrollIntoView());
+  return true;
+}
+
 /** All rich dependencies stay behind PaperNoteRichEditor's dynamic import. */
 export async function createPaperNoteEditor(
   host: HTMLElement,
@@ -232,7 +310,8 @@ export async function createPaperNoteEditor(
           return true;
         },
         handleDOMEvents: {
-          keydown(_view, event) {
+          keydown(view, event) {
+            if (deleteImageExcerpt(view, event)) return true;
             if (event.key !== "Enter" || !(event.target instanceof HTMLElement))
               return false;
             const link =

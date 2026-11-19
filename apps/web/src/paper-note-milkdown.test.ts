@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { editorViewCtx, parserCtx, serializerCtx } from "@milkdown/kit/core";
-import { TextSelection } from "@milkdown/kit/prose/state";
+import { NodeSelection, TextSelection } from "@milkdown/kit/prose/state";
 import { closeHistory } from "@milkdown/kit/prose/history";
 import { Slice, DOMParser, DOMSerializer } from "@milkdown/kit/prose/model";
 import { createPaperNoteEditor } from "./paper-note-milkdown";
@@ -221,6 +221,35 @@ const key = (
   view.dom.dispatchEvent(event);
   return event.defaultPrevented;
 };
+it.each([
+  [" ", "Backspace"],
+  ["  \n", "Delete"],
+  ["\n\n", "Backspace"],
+])(
+  "deletes a screenshot and its complete backlink together (%#)",
+  async (separator, deletionKey) => {
+    const documentId = "a".repeat(32),
+      annotationId = "b".repeat(32);
+    const image = `![截图](neoread-note-image://${documentId}/${annotationId})`;
+    const link = `[(论文, 第 2 页)](neoread://open?id=${documentId}&annotation=${annotationId})`;
+    const { view, change } = await create(
+      `前文\n\n${image}${separator}${link}\n\n后文`,
+    );
+    const imagePosition = view.state.doc.child(0).nodeSize + 1;
+    const selection =
+      deletionKey === "Delete"
+        ? NodeSelection.create(view.state.doc, imagePosition)
+        : TextSelection.create(
+            view.state.doc,
+            imagePosition + 1 + (separator === "\n\n" ? 2 : 0) + 3,
+          );
+    view.dispatch(view.state.tr.setSelection(selection));
+    expect(key(view, deletionKey)).toBe(true);
+    expect(change).toHaveBeenCalledOnce();
+    expect(change.mock.calls[0][0]).not.toMatch(/neoread|论文|截图/);
+    expect(view.state.doc.textContent).toBe("前文后文");
+  },
+);
 it("uses upstream Enter, Tab and Shift-Tab list commands, but leaves ordinary Tab available for focus", async () => {
   const { view } = await create("- first\n- second");
   view.dispatch(
