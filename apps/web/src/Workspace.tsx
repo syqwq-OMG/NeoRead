@@ -70,6 +70,7 @@ import {
   type ImageAttachment,
   type LinkPreview,
   neoreadLink,
+  parseNeoReadLink,
 } from "@neoread/core";
 import { Button } from "@neoread/ui/components/button";
 import { Badge } from "@neoread/ui/components/badge";
@@ -126,6 +127,7 @@ import { useSelectionClipboard } from "./useSelectionClipboard";
 import { copyImage, copyText } from "./chat/clipboard";
 import { NotesPanel } from "./NotesPanel";
 import { PaperNote } from "./PaperNote";
+import { appendExcerpt, copyExcerpt, excerptMarkdown } from "./note-excerpts";
 import { ExportDocumentDialog } from "./ExportDocumentDialog";
 import { EPUBReadingView } from "./translation/EPUBReadingView";
 import { PDFReadingView } from "./translation/PDFReadingView";
@@ -633,6 +635,33 @@ export function Workspace({
       },
       (e) => toast.error(e.message),
     );
+  };
+  const excerptSelection = async (copyOnly: boolean) => {
+    if (!selection || annotationSaving.current) return;
+    annotationSaving.current = true;
+    try {
+      const prepared =
+        (await adapter?.prepareAnnotation?.(selection)) ?? selection;
+      const saved = await api.annotate(doc.id, {
+        kind: "note",
+        location: prepared.location,
+        quote: prepared.text,
+        note: "",
+        color: markColor,
+      });
+      setAnnotations((items) => applySavedAnnotation(items, saved));
+      const markdown = excerptMarkdown(saved);
+      if (copyOnly) await copyExcerpt(markdown);
+      else {
+        await appendExcerpt(doc.id, markdown);
+        setRight(true);
+        setRightTab("paper-note");
+      }
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      annotationSaving.current = false;
+    }
   };
   const annotate = async (
     kind: Annotation["kind"],
@@ -1484,6 +1513,18 @@ export function Workspace({
 
             {selection?.anchor && (
               <SelectionToolbar anchor={selection.anchor} pane={readingPane}>
+                <IconButton
+                  label="复制摘录"
+                  onClick={() => void excerptSelection(true)}
+                >
+                  <Quote />
+                </IconButton>
+                <IconButton
+                  label="添加到笔记"
+                  onClick={() => void excerptSelection(false)}
+                >
+                  <StickyNote />
+                </IconButton>
                 <ColorSwatches
                   action="高亮"
                   onPick={(color) => {
@@ -1828,6 +1869,17 @@ export function Workspace({
                   key={doc.id}
                   documentId={doc.id}
                   annotations={annotations}
+                  onOpenReference={(url) => {
+                    const target = parseNeoReadLink(url);
+                    if (!target || target.id !== doc.id || !target.annotation)
+                      return false;
+                    const annotation = annotations.find(
+                      (item) => item.id === target.annotation,
+                    );
+                    if (annotation) focusAnnotation(annotation);
+                    else toast.info("这条原文批注已不存在");
+                    return true;
+                  }}
                   active={active && rightTab === "paper-note"}
                 />
               </TabsContent>

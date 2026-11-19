@@ -25,6 +25,7 @@ export function PaperNoteRichEditor({
   autoFocus = false,
   className = "",
   diagnosticScope = "paper_note",
+  onOpenReference,
 }: {
   body: string;
   disabled: boolean;
@@ -38,6 +39,7 @@ export function PaperNoteRichEditor({
   autoFocus?: boolean;
   className?: string;
   diagnosticScope?: "paper_note" | "annotation_note";
+  onOpenReference?: (url: string) => boolean;
 }) {
   const [source, setSource] = useState(false);
   const [mathEdit, setMathEdit] = useState<
@@ -81,8 +83,8 @@ export function PaperNoteRichEditor({
     setLoading(false);
     setSource(true);
   };
-  const latest = useRef({ body, onChange });
-  latest.current = { body, onChange };
+  const latest = useRef({ body, onChange, onOpenReference });
+  latest.current = { body, onChange, onOpenReference };
   useLayoutEffect(() => {
     try {
       editorRef.current?.setMarkdown(body);
@@ -114,6 +116,8 @@ export function PaperNoteRichEditor({
               },
               {
                 ariaLabel,
+                onOpenReference: (url) =>
+                  latest.current.onOpenReference?.(url) ?? false,
                 onEditMath: (request) => {
                   if (active)
                     setMathEdit({ ...request, id: ++mathEditSequence.current });

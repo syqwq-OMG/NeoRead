@@ -17,6 +17,7 @@ import {
 import { gfm, extendListItemSchemaForTask } from "@milkdown/kit/preset/gfm";
 import { history } from "@milkdown/kit/plugin/history";
 import { EditorState, Selection } from "@milkdown/kit/prose/state";
+import { parseNeoReadLink } from "@neoread/core";
 import type { EditorView } from "@milkdown/kit/prose/view";
 import { $node, $remark } from "@milkdown/kit/utils";
 import { Slice } from "@milkdown/kit/prose/model";
@@ -51,7 +52,13 @@ const inertLink = linkSchema.extendSchema((previous) => (ctx) => ({
   ],
   toDOM: (mark) => [
     "span",
-    { "data-note-link": mark.attrs.href, title: mark.attrs.title },
+    {
+      "data-note-link": mark.attrs.href,
+      title: mark.attrs.title,
+      ...(parseNeoReadLink(mark.attrs.href)
+        ? { role: "link", tabindex: "0" }
+        : {}),
+    },
     0,
   ],
 }));
@@ -152,9 +159,11 @@ export async function createPaperNoteEditor(
   {
     ariaLabel = "编辑论文笔记",
     onEditMath,
+    onOpenReference,
   }: {
     ariaLabel?: string;
     onEditMath?: (request: MathEditRequest) => void;
+    onOpenReference?: (url: string) => boolean;
   } = {},
 ) {
   let ready = false;
@@ -187,7 +196,11 @@ export async function createPaperNoteEditor(
           visit(tree, ["math", "inlineMath"], () => {
             hasMath = true;
           });
-          if (!hasMath) return false;
+          let hasReference = false;
+          visit(tree, "link", (node) => {
+            if (parseNeoReadLink(node.url)) hasReference = true;
+          });
+          if (!hasMath && !hasReference) return false;
           try {
             assertSupported(tree);
           } catch {
@@ -202,7 +215,26 @@ export async function createPaperNoteEditor(
           return true;
         },
         handleDOMEvents: {
+          keydown(_view, event) {
+            if (event.key !== "Enter" || !(event.target instanceof HTMLElement))
+              return false;
+            const link =
+              event.target.closest<HTMLElement>("[data-note-link]")?.dataset
+                .noteLink;
+            if (!link || !onOpenReference?.(link)) return false;
+            event.preventDefault();
+            return true;
+          },
           click(view, event) {
+            const link =
+              event.target instanceof Element
+                ? event.target.closest<HTMLElement>("[data-note-link]")?.dataset
+                    .noteLink
+                : undefined;
+            if (link && onOpenReference?.(link)) {
+              event.preventDefault();
+              return true;
+            }
             if (
               !(event.target instanceof HTMLInputElement) ||
               !event.target.hasAttribute("data-note-task")

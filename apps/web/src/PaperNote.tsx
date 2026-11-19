@@ -33,10 +33,12 @@ export function PaperNote({
   documentId,
   annotations,
   active = true,
+  onOpenReference,
 }: {
   documentId: string;
   annotations: Annotation[];
   active?: boolean;
+  onOpenReference?: (url: string) => boolean;
 }) {
   const note = useMemo(() => getPaperNote(documentId), [documentId]);
   const { body, status, error } = useSyncExternalStore(
@@ -123,6 +125,7 @@ export function PaperNote({
       <div className="paper-note">
         {active && !expanded && (
           <PaperNoteRichEditor
+            onOpenReference={onOpenReference}
             key={documentId}
             body={body}
             disabled={unavailable}
@@ -157,6 +160,7 @@ export function PaperNote({
         </DialogHeader>
         {expanded && active && (
           <PaperNoteRichEditor
+            onOpenReference={onOpenReference}
             key={documentId}
             body={body}
             disabled={unavailable}
