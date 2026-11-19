@@ -135,6 +135,8 @@ ZIP 包含：
 
 ## API 适配诊断
 
+区域截图的 `note.image.saved / rejected / save_failed` 记录保存字节数或稳定拒绝原因（体积、PNG 尺寸、PNG 数据、文件写入）；前端 `note.region.capture_failed` 区分 PDF 渲染和图片上传失败，读取器关闭与文档任务取消分别通过 `note.region.capture_cancelled`、`note.image.cancelled` 记录为正常取消。批注保存与笔记写入继续使用既有认证 API 和保存状态。日志不含截图字节、笔记正文、原文摘录或认证图片 URL，诊断包不额外收集 `note-assets`。存储与人工验收见 [原文摘录和区域截图](linked-notes.md)。
+
 常用 prompt 存在书库数据库的 `preferences:chat-prompts`，不随桌面服务端口变化。前端 `chat.prompts.load_failed` 区分服务端读取失败、服务端数据格式无效、旧浏览器存储读取失败、旧 JSON 解析失败及旧数据格式无效；失败时保留原始数据，不开放空列表写回。`chat.prompts.save_failed` 区分内容校验失败与服务端写入失败。旧配置仅在数据库写入成功后清理，清理失败记录 `chat.prompts.migration_cleanup_failed`，数据库中的已保存列表（包括空列表）始终优先。事件仅含受控原因，不记录描述、提示词、原始异常或存储正文。
 
 API 厂商规则、实际强度映射、上游错误分类和请求关联字段见 [API 厂商适配与错误诊断](api-provider-compatibility.md)。新增 API 错误事件只记录安全的结构化证据，不保存厂商可能回显正文的原始错误 message。
