@@ -746,7 +746,7 @@ export function Workspace({
     if (regionBusy) return;
     setRegionBusy(true);
     try {
-      const markdown = excerptMarkdown(annotation, true);
+      const markdown = excerptMarkdown(annotation, doc.title, true);
       if (copyOnly) {
         await copyImageExcerpt(async () => ({
           markdown,
@@ -795,7 +795,7 @@ export function Workspace({
         setSelection,
       );
       const markdown = saved
-        .map((annotation) => excerptMarkdown(annotation))
+        .map((annotation) => excerptMarkdown(annotation, doc.title))
         .join("\n\n");
       if (copyOnly) await copyExcerpt(markdown);
       else {
@@ -1187,7 +1187,7 @@ export function Workspace({
           }));
         setAnnotations((items) => applySavedAnnotation(items, saved));
         await api.saveNoteImage(doc.id, saved.id, image, signal);
-        return { markdown: excerptMarkdown(saved, true), image };
+        return { markdown: excerptMarkdown(saved, doc.title, true), image };
       });
       toast.success("已复制图片和原文位置");
     } catch (error) {

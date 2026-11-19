@@ -20,6 +20,7 @@ it("pastes stored region screenshots with a keyboard-accessible source backlink"
       quote: "图 1",
       location: { type: "pdf", page: 2 },
     } as Annotation,
+    "图像 [研究] &copy;",
     true,
   );
   const open = vi.fn(() => true);
@@ -55,6 +56,10 @@ it("pastes stored region screenshots with a keyboard-accessible source backlink"
   ).toEqual(view.state.doc.toJSON());
   const link = view.dom.querySelector<HTMLElement>("[data-note-link]")!;
   expect(image.closest("p")).toBe(link.closest("p"));
+  expect(link.textContent).toBe("(图像 [研究] &copy;, 第 2 页)");
+  expect(
+    image.closest("p")?.querySelector("br:not(.ProseMirror-trailingBreak)"),
+  ).toBeNull();
   expect(link.tabIndex).toBe(0);
   change.mockClear();
   link.dispatchEvent(new MouseEvent("click", { bubbles: true }));

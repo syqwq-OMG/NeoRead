@@ -1275,6 +1275,15 @@ kbd {
   max-width: 100%;
   height: auto;
 }
+.paper-note-rich img[data-note-image] {
+  display: block;
+}
+/* Older excerpts put a Markdown hard break after an already block-level image. */
+.paper-note-rich
+  img[data-note-image]
+  + br:has(+ [data-note-link][role="link"]) {
+  display: none;
+}
 .paper-note-rich
   p:has(img[data-note-image]):has(+ p > [data-note-link][role="link"]) {
   margin-bottom: 0;

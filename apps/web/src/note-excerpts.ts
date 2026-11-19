@@ -10,15 +10,24 @@ export function parseNoteImage(source: string) {
   );
   return match ? { documentId: match[1], annotationId: match[2] } : undefined;
 }
-const escape = (text: string) => text.replace(/[\\`*_[\]<>]/g, "\\$&");
-export function excerptMarkdown(annotation: Annotation, image = false) {
+const escape = (text: string) => text.replace(/[\\`*_[\]<>&]/g, "\\$&");
+export function excerptMarkdown(
+  annotation: Annotation,
+  title: string,
+  image = false,
+) {
   const content = image
     ? `![${escape(annotation.quote.trim().replace(/\s+/g, " ").slice(0, 120) || "区域截图")}](${noteImageSource(annotation.documentId, annotation.id)})`
     : annotation.quote
         .split(/\r?\n/)
         .map((line) => `> ${escape(line)}`)
         .join("\n");
-  return `${content}${image ? "  \n" : "\n\n"}[${escape(locationLabel(annotation.location))} · 原文](${neoreadLink({ id: annotation.documentId, annotation: annotation.id })})\n`;
+  const label = `(${title.replace(/\s+/g, " ").trim() || "未命名文档"}, ${locationLabel(annotation.location)})`;
+  const link = neoreadLink({
+    id: annotation.documentId,
+    annotation: annotation.id,
+  });
+  return `${content}${image ? " " : "\n\n"}[${escape(label)}](${link})\n`;
 }
 export async function appendExcerpt(documentId: string, markdown: string) {
   const note = getPaperNote(documentId);

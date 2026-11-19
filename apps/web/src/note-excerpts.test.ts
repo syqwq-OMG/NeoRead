@@ -19,11 +19,11 @@ const annotation = {
   location: { type: "pdf", page: 3 },
 } as Annotation;
 it("keeps source text literal and stores a durable annotation backlink", () => {
-  const markdown = excerptMarkdown(annotation);
+  const markdown = excerptMarkdown(annotation, "论文 [A]");
   expect(markdown).toContain("> \\[unsafe\\]");
   expect(markdown).not.toContain("<script>");
   expect(markdown).toContain(`annotation=${annotation.id}`);
-  expect(markdown).toContain("3");
+  expect(markdown).toContain("[(论文 \\[A\\], 第 3 页)]");
 });
 it("only resolves document-scoped screenshot references", () => {
   expect(
