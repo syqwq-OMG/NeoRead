@@ -90,7 +90,7 @@
   !include FileFunc.nsh
   !ifndef NEOREAD_INSTALL_MIGRATION_EXE
     ; PROJECT_DIR is the builder project directory (apps/desktop in package.mjs).
-    !define NEOREAD_INSTALL_MIGRATION_EXE "${PROJECT_DIR}/bin/neoread-server.exe"
+    !define NEOREAD_INSTALL_MIGRATION_EXE "${PROJECT_DIR}\bin\neoread-server.exe"
   !endif
 
   Var neoreadNewRoot
